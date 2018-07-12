@@ -83,14 +83,13 @@ def get_config(network, data_shape, **kwargs):
         num_layers = 50
         image_shape = '3,224,224'  # resnet require it as shape check
         network = 'resnet'
-        from_layers = ['_plus6', '_plus12', '_plus15', '', '']
-        num_filters = [-1, -1, -1, 256, 256]
-        strides = [-1, -1, -1, 2, 2]
-        pads = [-1, -1, -1, 1, 1]
-        sizes = get_scales(min_scale=0.2, max_scale=0.9, num_layers=len(from_layers))
-        # sizes = [[0.04, 0.0504, 0.063504], [0.08, 0.1008, 0.127008], [0.16, 0.2016, 0.254016],
-        #          [0.32, 0.4032, 0.508032], [0.64, 0.8064, 1.016064]]
-        ratios = [[1,2,.5], [1,2,.5], [1,2,.5], [1,2,.5], [1,2,.5]]
+        from_layers = ['P2', 'P3', 'P4', 'P5', 'P6']
+        num_filters = [-1, -1, -1, -1, -1]
+        strides = [-1, -1, -1, -1, -1]
+        pads = [-1, -1, -1, -1, -1]
+        sizes = get_scales(min_scale=0.2, max_scale=0.8, num_layers=len(from_layers))
+        ratios = [[1, 2, .5], [1, 2, .5, 3, 1. / 3], [1, 2, .5, 3, 1. / 3], [1, 2, .5, 3, 1. / 3], \
+                  [1, 2, .5]]
         normalizations = -1
         steps = []
         return locals()
@@ -98,14 +97,13 @@ def get_config(network, data_shape, **kwargs):
         num_layers = 101
         image_shape = '3,224,224'
         network = 'resnet'
-        from_layers = ['_plus6', '_plus29', '_plus32', '', '']
-        num_filters = [-1, -1, -1, 256, 256]
-        strides = [-1, -1, -1, 2, 2]
-        pads = [-1, -1, -1, 1, 1]
-        sizes = get_scales(min_scale=0.2, max_scale=0.9, num_layers=len(from_layers))
-        # sizes = [[0.04, 0.0504, 0.063504], [0.08, 0.1008, 0.127008], [0.16, 0.2016, 0.254016],
-        #          [0.32, 0.4032, 0.508032], [0.64, 0.8064, 1.016064]]
-        ratios = [[1, 2, .5], [1, 2, .5], [1, 2, .5], [1, 2, .5], [1, 2, .5]]
+        from_layers = ['P2', 'P3', 'P4', 'P5', 'P6']
+        num_filters = [-1, -1, -1, -1, -1]
+        strides = [-1, -1, -1, -1, -1]
+        pads = [-1, -1, -1, -1, -1]
+        sizes = get_scales(min_scale=0.2, max_scale=0.8, num_layers=len(from_layers))
+        ratios = [[1, 2, .5], [1, 2, .5, 3, 1. / 3], [1, 2, .5, 3, 1. / 3], [1, 2, .5, 3, 1. / 3], \
+                  [1, 2, .5]]
         normalizations = -1
         steps = []
         return locals()
@@ -231,7 +229,16 @@ def get_symbol_train(network, data_shape, alpha_bb8,  **kwargs):
         return symbol_builder.import_module(network).get_symbol_train(**kwargs)
     config = get_config(network, data_shape, **kwargs).copy()
     config.update(kwargs)
-    return symbol_builder.get_symbol_train(alpha_bb8=alpha_bb8, **config)
+    networks = {
+        'vgg16': symbol_builder.get_vgg_fpn_train,
+        'resnet50': symbol_builder.get_resnet_fpn_train,
+        'resnet101': symbol_builder.get_resnet_fpn_train
+    }
+    if network not in networks:
+        raise ValueError("network {} not supported".format(network))
+    return networks[network](alpha_bb8=alpha_bb8, **config)
+
+    # return symbol_builder.get_symbol_train(alpha_bb8=alpha_bb8, **config)
 
 def get_symbol(network, data_shape, **kwargs):
     """Wrapper for get symbol for test
