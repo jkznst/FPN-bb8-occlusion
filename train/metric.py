@@ -95,6 +95,9 @@ class MultiBoxMetric(mx.metric.EvalMetric):
                         loc_mae_pixel.append(np.abs((instanceDet[2:6] - instanceLabel[1:5]) * 300))
                         bb8_mae_pixel.append(np.abs((instanceDet[6:22] - instanceLabel[8:24]) * 300))
         loc_mae_pixel = np.array(loc_mae_pixel)
+        loc_mae_pixel_x = loc_mae_pixel[:, [0, 2]]
+        loc_mae_pixel_y = loc_mae_pixel[:, [1, 3]]
+        loc_mae_pixel = np.sqrt(np.square(loc_mae_pixel_x) + np.square(loc_mae_pixel_y))
         bb8_mae_pixel = np.array(bb8_mae_pixel)
         bb8_mae_pixel_x = bb8_mae_pixel[:, [0, 2, 4, 6, 8, 10, 12, 14]]
         bb8_mae_pixel_y = bb8_mae_pixel[:, [1, 3, 5, 7, 9, 11, 13, 15]]
