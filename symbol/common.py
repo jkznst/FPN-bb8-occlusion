@@ -79,7 +79,7 @@ def legacy_conv_act_layer(from_layer, name, num_filter, kernel=(1,1), pad=(0,0),
     return conv, relu
 
 
-def multi_layer_feature(body, from_layers, num_filters, strides, pads, min_filter=128):
+def multi_layer_feature_retina(body, from_layers, num_filters, strides, pads, min_filter=128):
     """Wrapper function to extract features from base network, attaching extra
     layers and SSD specific layers
 
@@ -118,7 +118,7 @@ def multi_layer_feature(body, from_layers, num_filters, strides, pads, min_filte
     # Lowest and highest pyramid levels in the backbone network. For FPN, we assume
     # that all networks have 5 spatial reductions, each by a factor of 2. Level 1
     # would correspond to the input image, hence it does not make sense to use it.
-    LOWEST_BACKBONE_LVL = 2  # E.g., "conv2"-like level
+
     HIGHEST_BACKBONE_LVL = 5  # E.g., "conv5"-like level
 
     internals = body.get_internals()
@@ -133,13 +133,14 @@ def multi_layer_feature(body, from_layers, num_filters, strides, pads, min_filte
             backbone_layers.append(layer)
 
     num_backbone_stages = len(backbone_layers)
+    LOWEST_BACKBONE_LVL = HIGHEST_BACKBONE_LVL - num_backbone_stages + 1  # E.g., "conv2"-like level
     num_extra_stages = len(from_layers) - num_backbone_stages
     inner_blobs = []
 
     # For the coarsest backbone level: 1x1 conv only seeds recursion
     C5 = backbone_layers[-1]
     bias = mx.symbol.Variable(name="fpn_inner_stage5_conv_1x1_bias",
-                              init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
+                              init=mx.init.Constant(0.0), attr={'__lr_mult__': '1.0'})
     fpn_inner_stage5 = mx.symbol.Convolution(data=C5, kernel=(1, 1), pad=(0, 0), num_filter=256, bias=bias,
                                          name='fpn_inner_stage5_conv_1x1')
     inner_blobs.append(fpn_inner_stage5)
@@ -152,7 +153,7 @@ def multi_layer_feature(body, from_layers, num_filters, strides, pads, min_filte
     for i in range(num_backbone_stages - 1):
         topdown = mx.symbol.UpSampling(inner_blobs[-1], scale=2, sample_type='nearest')
         bias = mx.symbol.Variable(name="fpn_inner_stage{}_conv_1x1_bias".format(4 - i),
-                                  init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
+                                  init=mx.init.Constant(0.0), attr={'__lr_mult__': '1.0'})
         lateral = mx.symbol.Convolution(data=backbone_layers[num_backbone_stages - i - 2],
                                         kernel=(1, 1),
                                         pad=(0, 0),
@@ -166,7 +167,7 @@ def multi_layer_feature(body, from_layers, num_filters, strides, pads, min_filte
     blobs_fpn = []
     for i in range(num_backbone_stages):
         bias = mx.symbol.Variable(name="fpn_stage{}_conv_3x3_bias".format(5 - i),
-                                  init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
+                                  init=mx.init.Constant(0.0), attr={'__lr_mult__': '1.0'})
         fpn_blob = mx.symbol.Convolution(data=inner_blobs[i],
                                          kernel=(3,3),
                                          pad=(1,1),
@@ -189,12 +190,12 @@ def multi_layer_feature(body, from_layers, num_filters, strides, pads, min_filte
         if i > HIGHEST_BACKBONE_LVL + 1:
             fpn_blob_in = mx.symbol.Activation(fpn_blob, act_type='relu')
         bias = mx.symbol.Variable(name="fpn_stage{}_conv_3x3_bias".format(i),
-                                  init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
+                                  init=mx.init.Constant(0.0), attr={'__lr_mult__': '1.0'})
         fpn_blob = mx.symbol.Convolution(fpn_blob_in,
                                          kernel=(3, 3),
-                                         stride=(strides[i - 3], strides[i - 3]),
-                                         pad=(pads[i - 3], pads[i - 3]),
-                                         num_filter=num_filters[i - 3],
+                                         stride=(strides[i - LOWEST_BACKBONE_LVL], strides[i - LOWEST_BACKBONE_LVL]),
+                                         pad=(pads[i - LOWEST_BACKBONE_LVL], pads[i - LOWEST_BACKBONE_LVL]),
+                                         num_filter=num_filters[i - LOWEST_BACKBONE_LVL],
                                          bias=bias,
                                          name='fpn_stage{}_conv_3x3'.format(i))
         blobs_fpn.append(fpn_blob)
@@ -364,7 +365,7 @@ def multibox_layer_retina(from_layers, num_classes, sizes=[.2, .95],
     cls_score_weight = mx.symbol.Variable(name='cls_score_weight',
                                           init=mx.init.Normal(sigma=0.01))
     cls_score_bias = mx.symbol.Variable(name='cls_score_bias',
-                                        init=mx.init.Constant(-np.log(99.)), attr={'__lr_mult__': '2.0'})
+                                        init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
 
     box_conv1_weight = mx.symbol.Variable(name='box_conv1_weight',
                                           init=mx.init.Normal(sigma=0.01))
@@ -414,7 +415,7 @@ def multibox_layer_retina(from_layers, num_classes, sizes=[.2, .95],
     bb8_pred_weight = mx.symbol.Variable(name='bb8_pred_weight',
                                          init=mx.init.Normal(sigma=0.01))
     bb8_pred_bias = mx.symbol.Variable(name='bb8_pred_bias',
-                                       init=mx.init.Constant(-np.log(99.)), attr={'__lr_mult__': '2.0'})
+                                       init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
 
     for k, from_layer in enumerate(from_layers):
         from_name = from_layer.name
