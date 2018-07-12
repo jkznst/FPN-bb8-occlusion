@@ -29,9 +29,9 @@ def parse_args():
     parser.add_argument('--epoch', dest='epoch', help='epoch of pretrained model',
                         default=0, type=int)
     parser.add_argument('--prefix', dest='prefix', help='new model prefix',
-                        default=os.path.join(os.getcwd(), 'output', 'exp1', 'ssd'), type=str)
+                        default=os.path.join(os.getcwd(), 'output', 'exp1', 'fpn'), type=str)
     parser.add_argument('--gpus', dest='gpus', help='GPU devices to train with',
-                        default='1', type=str)
+                        default='0', type=str)
     parser.add_argument('--begin-epoch', dest='begin_epoch', help='begin epoch of training',
                         default=0, type=int)
     parser.add_argument('--end-epoch', dest='end_epoch', help='end epoch of training',
@@ -124,6 +124,30 @@ if __name__ == '__main__':
     ctx = [mx.cpu()] if not ctx else ctx
     # class names if applicable
     class_names = parse_class_names(args)
+    if args.network == 'vgg16_reduced':
+        if not args.pretrained:
+            args.pretrained = 'model/vgg16_reduced-0001.params'
+        if not args.prefix:
+            args.prefix = 'out/vgg16_reduced'
+        args.freeze_pattern = ['conv1', 'conv2']
+    elif args.network == 'resnet50':
+        if not args.pretrained:
+            args.pretrained = 'model/resnet-50-0000.params'
+        if not args.prefix:
+            args.prefix = 'out/resnet50'
+        args.mean_r = 0.0
+        args.mean_g = 0.0
+        args.mean_b = 0.0
+        args.freeze_pattern = ['conv0', 'stage1', 'gamma', 'beta']
+    elif args.network == 'resnet101':
+        if not args.pretrained:
+            args.pretrained = 'model/resnet-101-0000.params'
+        if not args.prefix:
+            args.prefix = 'out/resnet101'
+        args.mean_r = 0.0
+        args.mean_g = 0.0
+        args.mean_b = 0.0
+        args.freeze_pattern = ['conv0', 'stage1', 'gamma', 'beta']
     # start training
     train_net(args.network, args.train_path,
               args.num_class, args.batch_size,
