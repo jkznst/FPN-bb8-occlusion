@@ -31,39 +31,12 @@ class MultiBoxMetric(mx.metric.EvalMetric):
                            anchors, loc_label, loc_pred_masked, loc_mae, bb8_label, bb8_pred_masked, bb8_mae]
         Implementation of updating metrics
         """
-        def iou(x, ys):
-            """
-            Calculate intersection-over-union overlap
-            Params:
-            ----------
-            x : numpy.array
-                single box [xmin, ymin ,xmax, ymax]
-            ys : numpy.array
-                multiple box [[xmin, ymin, xmax, ymax], [...], ]
-            Returns:
-            -----------
-            numpy.array
-                [iou1, iou2, ...], size == ys.shape[0]
-            """
-            ixmin = np.maximum(ys[:, 0], x[0])
-            iymin = np.maximum(ys[:, 1], x[1])
-            ixmax = np.minimum(ys[:, 2], x[2])
-            iymax = np.minimum(ys[:, 3], x[3])
-            iw = np.maximum(ixmax - ixmin, 0.)
-            ih = np.maximum(iymax - iymin, 0.)
-            inters = iw * ih
-            uni = (x[2] - x[0]) * (x[3] - x[1]) + (ys[:, 2] - ys[:, 0]) * \
-                (ys[:, 3] - ys[:, 1]) - inters
-            ious = inters / uni
-            ious[uni < 1e-12] = 0  # in case bad boxes
-            return ious
-
         labels = labels[0].asnumpy()
         # get generated multi label from network
         cls_prob = preds[0]
         loc_loss = preds[1].asnumpy()     # smoothL1 loss
-        loc_loss_in_use = loc_loss[loc_loss.nonzero()]
-        cls_label = preds[2].asnumpy()
+        # loc_loss_in_use = loc_loss[loc_loss.nonzero()]
+        cls_target = preds[2].asnumpy()
         bb8_loss = preds[3].asnumpy()
         loc_pred = preds[4]
         bb8_pred = preds[5]
@@ -73,16 +46,24 @@ class MultiBoxMetric(mx.metric.EvalMetric):
                                       variances=(0.1, 0.1, 0.2, 0.2), nms_topk=400)
         bb8dets = bb8dets.asnumpy()
 
-        loc_label = preds[7].asnumpy()
-        loc_label_in_use = loc_label[loc_label.nonzero()]
-        loc_pred_masked = preds[8].asnumpy()
-        loc_pred_in_use = loc_pred_masked[loc_pred_masked.nonzero()]
+        # monitor results
+        # loc_target = preds[7].asnumpy()
+        # loc_label_in_use = loc_target[loc_target.nonzero()]
+        # loc_pred_masked = preds[8].asnumpy()
+        # loc_pred_in_use = loc_pred_masked[loc_pred_masked.nonzero()]
+        # bb8_target = preds[10].asnumpy()
+        # bb8_label_in_use = bb8_target[bb8_target.nonzero()]
+        # bb8_pred_masked = preds[11].asnumpy()
+        # bb8_pred_in_use = bb8_pred_masked[bb8_pred_masked.nonzero()]
         loc_mae = preds[9].asnumpy()
-        loc_mae_in_use = loc_mae[loc_mae.nonzero()]
-        # loc_mae_pixel = np.abs((bb8dets[:, 0, 2:6] - labels[:, 0, 1:5]) * 300)   # need to be refined
+        # loc_mae_in_use = loc_mae[loc_mae.nonzero()]
+        bb8_mae = preds[12].asnumpy()
+        # bb8_mae_in_use = bb8_mae[bb8_mae.nonzero()]
+
         # for each class, only consider the most confident instance
         loc_mae_pixel = []
         bb8_mae_pixel = []
+        image_size = 300.0
         for sampleDet, sampleLabel in zip(bb8dets, labels):
             for instanceLabel in sampleLabel:
                 if instanceLabel[0] < 0:
@@ -92,8 +73,12 @@ class MultiBoxMetric(mx.metric.EvalMetric):
                     indices = np.where(sampleDet[:, 0] == cid)[0]
                     if indices.size > 0:
                         instanceDet = sampleDet[indices[0]] # only consider the most confident instance
-                        loc_mae_pixel.append(np.abs((instanceDet[2:6] - instanceLabel[1:5]) * 300))
-                        bb8_mae_pixel.append(np.abs((instanceDet[6:22] - instanceLabel[8:24]) * 300))
+                        loc_mae_pixel.append(np.abs((instanceDet[2:6] - instanceLabel[1:5]) * image_size))
+                        bb8_mae_pixel.append(np.abs((instanceDet[6:22] - instanceLabel[8:24]) * image_size))
+                    else:
+                        # punish missed gt
+                        loc_mae_pixel.append(np.ones(shape=(4,), dtype=np.float32) * image_size)
+                        bb8_mae_pixel.append(np.ones(shape=(16,), dtype=np.float32) * image_size)
         loc_mae_pixel = np.array(loc_mae_pixel)
         loc_mae_pixel_x = loc_mae_pixel[:, [0, 2]]
         loc_mae_pixel_y = loc_mae_pixel[:, [1, 3]]
@@ -103,67 +88,17 @@ class MultiBoxMetric(mx.metric.EvalMetric):
         bb8_mae_pixel_y = bb8_mae_pixel[:, [1, 3, 5, 7, 9, 11, 13, 15]]
         bb8_mae_pixel = np.sqrt(np.square(bb8_mae_pixel_x) + np.square(bb8_mae_pixel_y))
 
-        bb8_label = preds[10].asnumpy()
-        bb8_label_in_use = bb8_label[bb8_label.nonzero()]
-        bb8_pred = preds[11].asnumpy()
-        bb8_pred_in_use = bb8_pred[bb8_pred.nonzero()]
-        bb8_mae = preds[12].asnumpy()
-        bb8_mae_in_use = bb8_mae[bb8_mae.nonzero()]
-        # bb8_mae_pixel = np.abs((labels[:, 0, 8:24] - bb8dets[:, 0, 6:22]) * 300)  # need to be refined
-
-        # loc_mae_pixel = []
-        # bb8_mae_pixel = []
-        # # independant execution for each image
-        # for i in range(labels.shape[0]):
-        #     # get as numpy arrays
-        #     label = labels[i]
-        #     pred = bb8dets[i]
-        #     loc_mae_pixel_per_image = []
-        #     bb8_mae_pixel_per_image = []
-        #     # calculate for each class
-        #     while (pred.shape[0] > 0):
-        #         cid = int(pred[0, 0])
-        #         indices = np.where(pred[:, 0].astype(int) == cid)[0]
-        #         if cid < 0:
-        #             pred = np.delete(pred, indices, axis=0)
-        #             continue
-        #         dets = pred[indices]
-        #         pred = np.delete(pred, indices, axis=0)
-        #
-        #         # ground-truths
-        #         label_indices = np.where(label[:, 0].astype(int) == cid)[0]
-        #         gts = label[label_indices, :]
-        #         label = np.delete(label, label_indices, axis=0)
-        #         if gts.size > 0:
-        #             found = [False] * gts.shape[0]
-        #             for j in range(dets.shape[0]):
-        #                 # compute overlaps
-        #                 ious = iou(dets[j, 2:6], gts[:, 1:5])
-        #                 ovargmax = np.argmax(ious)
-        #                 ovmax = ious[ovargmax]
-        #                 if ovmax > self.ovp_thresh:
-        #                     if not found[ovargmax]:
-        #                         loc_mae_pixel_per_image.append(np.abs((dets[j, 2:6] - gts[ovargmax, 1:5]) * 300))   # tp
-        #                         bb8_mae_pixel_per_image.append(np.abs((dets[j, 6:22] - gts[ovargmax, 8:24]) * 300))
-        #                         found[ovargmax] = True
-        #                     else:
-        #                         # duplicate
-        #                         pass  # fp
-        #
-        #     loc_mae_pixel.append(np.mean(loc_mae_pixel_per_image, axis=1))
-        #     bb8_mae_pixel.append(np.mean(bb8_mae_pixel_per_image, axis=1))
-
-
-        valid_count = np.sum(cls_label >= 0)
-        box_count = np.sum(cls_label > 0)
+        valid_count = np.sum(cls_target >= 0)
+        box_count = np.sum(cls_target > 0)
         # overall accuracy & object accuracy
-        label = cls_label.flatten()
+        label = cls_target.flatten()
         # in case you have a 'other' class
         label[np.where(label >= cls_prob.shape[1])] = 0
         mask = np.where(label >= 0)[0]
         indices = np.int64(label[mask])
         prob = cls_prob.transpose((0, 2, 1)).reshape((-1, cls_prob.shape[1])).asnumpy()
         prob = prob[mask, indices]
+
         self.sum_metric[0] += (-np.log(prob + self.eps)).sum()
         self.num_inst[0] += valid_count
         # loc_smoothl1loss
