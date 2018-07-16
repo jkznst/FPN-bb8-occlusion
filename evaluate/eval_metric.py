@@ -391,63 +391,37 @@ class PoseMetric(mx.metric.EvalMetric):
                            anchors, loc_label, loc_pred_masked, loc_mae, bb8_label, bb8_pred_masked, bb8_mae]
         Implementation of updating metrics
         """
-        def iou(x, ys):
-            """
-            Calculate intersection-over-union overlap
-            Params:
-            ----------
-            x : numpy.array
-                single box [xmin, ymin ,xmax, ymax]
-            ys : numpy.array
-                multiple box [[xmin, ymin, xmax, ymax], [...], ]
-            Returns:
-            -----------
-            numpy.array
-                [iou1, iou2, ...], size == ys.shape[0]
-            """
-            ixmin = np.maximum(ys[:, 0], x[0])
-            iymin = np.maximum(ys[:, 1], x[1])
-            ixmax = np.minimum(ys[:, 2], x[2])
-            iymax = np.minimum(ys[:, 3], x[3])
-            iw = np.maximum(ixmax - ixmin, 0.)
-            ih = np.maximum(iymax - iymin, 0.)
-            inters = iw * ih
-            uni = (x[2] - x[0]) * (x[3] - x[1]) + (ys[:, 2] - ys[:, 0]) * \
-                (ys[:, 3] - ys[:, 1]) - inters
-            ious = inters / uni
-            ious[uni < 1e-12] = 0  # in case bad boxes
-            return ious
-
         labels = labels[0].asnumpy()    # batchsize x 8 x 40
         # get generated multi label from network
         cls_prob = preds[0] # batchsize x num_cls x num_anchors
         loc_loss = preds[1].asnumpy()     # smoothL1 loss
-        loc_loss_in_use = loc_loss[loc_loss.nonzero()]
-        cls_label = preds[2].asnumpy()  # batchsize x num_anchors
+        # loc_loss_in_use = loc_loss[loc_loss.nonzero()]
+        cls_target = preds[2].asnumpy()  # batchsize x num_anchors
         bb8_loss = preds[3].asnumpy()
         loc_pred = preds[4]
         bb8_pred = preds[5]
         anchors = preds[6]
         # anchor_in_use = anchors[anchors.nonzero()]
 
-        # basic evaluation, adapt to multi-class
-        loc_label = preds[7].asnumpy()
-        loc_label_in_use = loc_label[loc_label.nonzero()]
-        loc_pred_masked = preds[8].asnumpy()
-        loc_pred_in_use = loc_pred_masked[loc_pred_masked.nonzero()]
+        # monitor results
+        # loc_target = preds[7].asnumpy()
+        # loc_target_in_use = loc_target[loc_target.nonzero()]
+        # loc_pred_masked = preds[8].asnumpy()
+        # loc_pred_in_use = loc_pred_masked[loc_pred_masked.nonzero()]
         loc_mae = preds[9].asnumpy()
-        loc_mae_in_use = loc_mae[loc_mae.nonzero()]
-        bb8_label = preds[10].asnumpy()
-        bb8_label_in_use = bb8_label[bb8_label.nonzero()]
-        bb8_pred_masked = preds[11].asnumpy()
-        bb8_pred_in_use = bb8_pred_masked[bb8_pred_masked.nonzero()]
+        # loc_mae_in_use = loc_mae[loc_mae.nonzero()]
+        # bb8_target = preds[10].asnumpy()
+        # bb8_target_in_use = bb8_target[bb8_target.nonzero()]
+        # bb8_pred_masked = preds[11].asnumpy()
+        # bb8_pred_in_use = bb8_pred_masked[bb8_pred_masked.nonzero()]
         bb8_mae = preds[12].asnumpy()
-        bb8_mae_in_use = bb8_mae[bb8_mae.nonzero()]
+        # bb8_mae_in_use = bb8_mae[bb8_mae.nonzero()]
 
-        valid_count = np.sum(cls_label >= 0)
-        box_count = np.sum(cls_label > 0)
+        # basic evaluation
+        valid_count = np.sum(cls_target >= 0)
+        box_count = np.sum(cls_target > 0)
         # overall accuracy & object accuracy
-        label = cls_label.flatten()
+        label = cls_target.flatten()
         # in case you have a 'other' class
         label[np.where(label >= cls_prob.shape[1])] = 0
         mask = np.where(label >= 0)[0]
@@ -473,74 +447,6 @@ class PoseMetric(mx.metric.EvalMetric):
                                       variances=(0.1, 0.1, 0.2, 0.2), nms_topk=400)
         bb8dets = bb8dets.asnumpy()
 
-        # model_id = int(self.classes[0].strip("obj_"))
-        #
-        # for nbatch in range(bb8dets.shape[0]):
-        #
-        #     self.num_inst[7] += 1
-        #     self.num_inst[8] += 1
-        #     self.num_inst[9] += 1
-        #     self.num_inst[10] += 1
-        #     self.num_inst[11] += 1
-        #     self.num_inst[12] += 1
-        #     self.num_inst[13] += 1
-        #     self.num_inst[14] += 1
-        #     self.num_inst[15] += 1
-        #
-        #     if bb8dets[nbatch, 0, 0] == -1:
-        #         continue
-        #     else:
-        #         # for LINEMOD dataset, for each image only select the first det
-        #         # self.validate6Dpose(gt_pose=labels[nbatch, 0, 24:40], instance_bb8det=bb8dets[nbatch, 0, :], model_id=model_id)
-        #         pose_est = self.calculate6Dpose(instance_bb8det=bb8dets[nbatch, 0, :], model_id=model_id)
-        #         model_path = '/data/ZHANGXIN/DATASETS/SIXD_CHALLENGE/LINEMOD/models/' + self.classes[int(bb8dets[nbatch, 0, 0])] + '.ply'
-        #         model_ply = inout.load_ply(model_path)
-        #         model_ply['pts'] = model_ply['pts'] * self.scale_to_meters
-        #         pose_gt_transform = np.reshape(labels[nbatch, 0, 24:40], newshape=(4, 4))
-        #         pose_gt = {"R": pose_gt_transform[0:3, 0:3],
-        #         "t": pose_gt_transform[0:3, 3:4]}
-        #
-        #         # absolute pose error
-        #         rot_error = pose_error.re(R_est=pose_est["R"], R_gt=pose_gt["R"]) / np.pi * 180.
-        #         trans_error = pose_error.te(t_est=pose_est["t"], t_gt=pose_gt["t"]) / 0.01
-        #
-        #         # other pose metrics
-        #         add_metric = pose_error.add(pose_est=pose_est, pose_gt=pose_gt, model=model_ply)    # use adi when object is eggbox or glue
-        #         reproj_metric = pose_error.reprojectionError(pose_est=pose_est, pose_gt=pose_gt,
-        #                                                      model=model_ply, K=self.cam_intrinsic[:, 0:3])
-        #         cou_metric = pose_error.cou(pose_est=pose_est, pose_gt=pose_gt,
-        #                                     model=model_ply, im_size=(640, 480), K=self.cam_intrinsic[:, 0:3])
-        #
-        #         # metric update
-        #         if reproj_metric <= 5:  # reprojection error less than 5 pixels
-        #             self.sum_metric[7] += 1
-        #
-        #         if add_metric <= self.models_info[bb8dets[nbatch, 0, 0] + model_id]['diameter'] * self.scale_to_meters * 0.1:   # ADD metric less than 0.1 * diameter
-        #             self.sum_metric[8] += 1
-        #
-        #         if add_metric <= self.models_info[bb8dets[nbatch, 0, 0] + model_id]['diameter'] * self.scale_to_meters * 0.3:   # ADD metric less than 0.1 * diameter
-        #             self.sum_metric[9] += 1
-        #
-        #         if add_metric <= self.models_info[bb8dets[nbatch, 0, 0] + model_id]['diameter'] * self.scale_to_meters * 0.5:   # ADD metric less than 0.1 * diameter
-        #             self.sum_metric[10] += 1
-        #
-        #         if rot_error < 5:   # 5 degrees
-        #             self.sum_metric[11] += 1
-        #
-        #         if trans_error < 5: # 5 cm
-        #             self.sum_metric[12] += 1
-        #
-        #         if (rot_error < 5) and (trans_error < 5):   # 5 degrees and 5 cm
-        #             self.sum_metric[13] += 1
-        #
-        #         if cou_metric < 0.5:    # 2D IoU greater than 0.5
-        #             self.sum_metric[14] += 1
-        #
-        #         if cou_metric < 0.1:    # 2D IoU larger than 0.9
-        #             self.sum_metric[15] += 1
-#
-
-        # for each class, only consider the most confident instance
         loc_mae_pixel = []
         bb8_mae_pixel = []
 
@@ -563,8 +469,8 @@ class PoseMetric(mx.metric.EvalMetric):
                     if indices.size > 0:
                         instanceDet = sampleDet[indices[0]]  # only consider the most confident instance
 
-                        loc_mae_pixel.append(np.abs((instanceDet[2:6] - instanceLabel[1:5]) * 300))
-                        bb8_mae_pixel.append(np.abs((instanceDet[6:22] - instanceLabel[8:24]) * 300))
+                        loc_mae_pixel.append(np.abs((instanceDet[2:6] - instanceLabel[1:5]) * 300.))
+                        bb8_mae_pixel.append(np.abs((instanceDet[6:22] - instanceLabel[8:24]) * 300.))
 
                         pose_est = self.calculate6Dpose(instance_bb8det=instanceDet, model_id=model_id)
                         model_path = os.path.join(self.LINEMOD_path, 'models', '{}.ply'.format(self.classes[cid]))
@@ -583,13 +489,14 @@ class PoseMetric(mx.metric.EvalMetric):
                             add_metric = pose_error.adi(pose_est=pose_est, pose_gt=pose_gt,
                                                         model=model_ply)  # use adi when object is eggbox or glue
                         else:
-                            add_metric = pose_error.add(pose_est=pose_est, pose_gt=pose_gt, model=model_ply)    # use adi when object is eggbox or glue
+                            add_metric = pose_error.add(pose_est=pose_est, pose_gt=pose_gt, model=model_ply)    # use add otherwise
 
                         reproj_metric = pose_error.reprojectionError(pose_est=pose_est, pose_gt=pose_gt,
                                                                      model=model_ply, K=self.cam_intrinsic[:, 0:3])
                         cou_metric = pose_error.cou(pose_est=pose_est, pose_gt=pose_gt,
                                                     model=model_ply, im_size=(640, 480), K=self.cam_intrinsic[:, 0:3])
 
+                        # record all the Reproj. error to plot curve
                         if cid not in self.Reproj:
                             self.Reproj[cid] = [reproj_metric]
                         else:
@@ -659,8 +566,14 @@ class PoseMetric(mx.metric.EvalMetric):
                             else:
                                 assert cid in self.counts
                                 self.IoU2D0_9[cid] += 1
+                    else:
+                        loc_mae_pixel.append(np.ones((4, )) * 300.)
+                        bb8_mae_pixel.append(np.ones((16, )) * 300.)
 
         loc_mae_pixel = np.array(loc_mae_pixel)
+        loc_mae_pixel_x = loc_mae_pixel[:, [0, 2]]
+        loc_mae_pixel_y = loc_mae_pixel[:, [1, 3]]
+        loc_mae_pixel = np.sqrt(np.square(loc_mae_pixel_x) + np.square(loc_mae_pixel_y))
         bb8_mae_pixel = np.array(bb8_mae_pixel)
         bb8_mae_pixel_x = bb8_mae_pixel[:, [0, 2, 4, 6, 8, 10, 12, 14]]
         bb8_mae_pixel_y = bb8_mae_pixel[:, [1, 3, 5, 7, 9, 11, 13, 15]]
