@@ -230,7 +230,7 @@ def get_symbol_train(network, data_shape, alpha_bb8,  **kwargs):
     config = get_config(network, data_shape, **kwargs).copy()
     config.update(kwargs)
     networks = {
-        'vgg16': symbol_builder.get_vgg_fpn_train,
+        'vgg16': symbol_builder.get_vgg_reduced_fpn_train,
         'resnet50': symbol_builder.get_resnet_fpn_train,
         'resnet101': symbol_builder.get_resnet_fpn_train
     }
