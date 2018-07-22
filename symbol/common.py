@@ -699,6 +699,17 @@ def multibox_layer(from_layers, num_classes, sizes=[.2, .95],
     anchor_layers = []
     num_classes += 1 # always use background as label 0
 
+    # shared weights
+    loc_pred_weight = mx.symbol.Variable(name="loc_pred_conv_weight")
+    loc_pred_bias = mx.symbol.Variable(name="loc_pred_conv_bias",
+                              init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
+    cls_pred_weight = mx.symbol.Variable(name="cls_pred_conv_weight")
+    cls_pred_bias = mx.symbol.Variable(name="cls_pred_conv_bias",
+                            init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
+    bb8_pred_weight = mx.symbol.Variable(name="bb8_pred_conv_weight")
+    bb8_pred_bias = mx.symbol.Variable(name="bb8_pred_conv_bias",
+                                       init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
+
     for k, from_layer in enumerate(from_layers):
         from_name = from_layer.name
         # normalize
@@ -730,9 +741,9 @@ def multibox_layer(from_layers, num_classes, sizes=[.2, .95],
 
         # create location prediction layer
         num_loc_pred = num_anchors * 4
-        bias = mx.symbol.Variable(name="{}_loc_pred_conv_bias".format(from_name),
-            init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
-        loc_pred = mx.symbol.Convolution(data=from_layer, bias=bias, kernel=(3,3), \
+        # bias = mx.symbol.Variable(name="{}_loc_pred_conv_bias".format(from_name),
+        #     init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
+        loc_pred = mx.symbol.Convolution(data=from_layer, weight=loc_pred_weight, bias=loc_pred_bias, kernel=(3,3), \
             stride=(1,1), pad=(1,1), num_filter=num_loc_pred, \
             name="{}_loc_pred_conv".format(from_name))
         loc_pred = mx.symbol.transpose(loc_pred, axes=(0,2,3,1))
@@ -741,9 +752,9 @@ def multibox_layer(from_layers, num_classes, sizes=[.2, .95],
 
         # create bb8 prediction layer
         num_bb8_pred = num_anchors * 16
-        bias = mx.symbol.Variable(name="{}_bb8_pred_conv_bias".format(from_name),
-                                  init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
-        bb8_pred = mx.symbol.Convolution(data=from_layer, bias=bias, kernel=(3, 3), \
+        # bias = mx.symbol.Variable(name="{}_bb8_pred_conv_bias".format(from_name),
+        #                           init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
+        bb8_pred = mx.symbol.Convolution(data=from_layer, weight=bb8_pred_weight, bias=bb8_pred_bias, kernel=(3, 3), \
                                          stride=(1, 1), pad=(1, 1), num_filter=num_bb8_pred, \
                                          name="{}_bb8_pred_conv".format(from_name))
         bb8_pred = mx.symbol.transpose(bb8_pred, axes=(0, 2, 3, 1))
@@ -752,9 +763,9 @@ def multibox_layer(from_layers, num_classes, sizes=[.2, .95],
 
         # create class prediction layer
         num_cls_pred = num_anchors * num_classes
-        bias = mx.symbol.Variable(name="{}_cls_pred_conv_bias".format(from_name),
-            init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
-        cls_pred = mx.symbol.Convolution(data=from_layer, bias=bias, kernel=(3,3), \
+        # bias = mx.symbol.Variable(name="{}_cls_pred_conv_bias".format(from_name),
+        #     init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
+        cls_pred = mx.symbol.Convolution(data=from_layer, weight=cls_pred_weight, bias=cls_pred_bias, kernel=(3,3), \
             stride=(1,1), pad=(1,1), num_filter=num_cls_pred, \
             name="{}_cls_pred_conv".format(from_name))
         cls_pred = mx.symbol.transpose(cls_pred, axes=(0,2,3,1))
