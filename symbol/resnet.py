@@ -56,7 +56,7 @@ def conv_layer(data, name, num_filter, kernel=(1,1), pad=(0,0), \
     return conv
 
 
-def residual_unit(data, num_filter, stride, dim_match, name, bottle_neck=True, dilate=1, bn_mom=0.9, workspace=256, memonger=False):
+def residual_unit(data, num_filter, stride, dim_match, name, bottle_neck=True, dilate=(1, 1), bn_mom=0.9, workspace=256, memonger=False):
     """Return ResNet Unit symbol for building ResNet
     Parameters
     ----------
@@ -234,14 +234,14 @@ def get_resnet_conv_down_mask_style(conv_feat):
 def get_detnet_conv(data, num_layers):
     _, conv_C4, conv_C3, conv_C2 = get_resnet_conv(data, num_layers)
     #  detnet res5
-    unit = residual_unit(data=conv_C4, num_filter=1024, stride=(1, 1), dim_match=False, name='detnet_stage5_unit1', dilate=2)
+    unit = residual_unit(data=conv_C4, num_filter=1024, stride=(1, 1), dim_match=False, name='detnet_stage5_unit1', dilate=(2,2))
     for i in range(2, units[3] + 1):
         unit = residual_unit(data=unit, num_filter=1024, stride=(1, 1), dim_match=True,
                              name='detnet_stage5_unit%s' % i)
     conv_C5 = unit
     # detnet res6
     unit = residual_unit(data=unit, num_filter=1024, stride=(1, 1), dim_match=False, name='detnet_stage6_unit1',
-                         dilate=2)
+                         dilate=(2,2))
     for i in range(2, 4):
         unit = residual_unit(data=unit, num_filter=1024, stride=(1, 1), dim_match=True,
                              name='detnet_stage6_unit%s' % i)
