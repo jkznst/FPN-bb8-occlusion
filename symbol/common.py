@@ -2,7 +2,7 @@ import mxnet as mx
 import numpy as np
 
 def conv_act_layer(from_layer, name, num_filter, kernel=(1,1), pad=(0,0), \
-    stride=(1,1), act_type="relu", use_batchnorm=False):
+    stride=(1,1), use_act=True, act_type="relu", use_batchnorm=False):
     """
     wrapper for a small Convolution group
 
@@ -35,8 +35,11 @@ def conv_act_layer(from_layer, name, num_filter, kernel=(1,1), pad=(0,0), \
         stride=stride, num_filter=num_filter, name="{}_conv".format(name), bias=bias)
     if use_batchnorm:
         conv = mx.symbol.BatchNorm(data=conv, name="{}_bn".format(name))
-    relu = mx.symbol.Activation(data=conv, act_type=act_type, \
-        name="{}_{}".format(name, act_type))
+    if use_act:
+        relu = mx.symbol.Activation(data=conv, act_type=act_type, \
+            name="{}_{}".format(name, act_type))
+    else:
+        relu = conv
     return relu
 
 def legacy_conv_act_layer(from_layer, name, num_filter, kernel=(1,1), pad=(0,0), \
