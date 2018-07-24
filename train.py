@@ -139,6 +139,15 @@ if __name__ == '__main__':
         args.mean_g = 0.0
         args.mean_b = 0.0
         args.freeze_pattern = ['conv0', 'stage1', 'gamma', 'beta']
+    elif args.network == 'resnet50m':
+        if not args.pretrained:
+            args.pretrained = 'model/resnet-50-0000.params'
+        if not args.prefix:
+            args.prefix = 'out/resnet50'
+        args.mean_r = 0.0
+        args.mean_g = 0.0
+        args.mean_b = 0.0
+        args.freeze_pattern = ['conv0', 'stage1', 'gamma', 'beta']
     elif args.network == 'resnet101':
         if not args.pretrained:
             args.pretrained = 'model/resnet-101-0000.params'
