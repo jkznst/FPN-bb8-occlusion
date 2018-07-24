@@ -258,16 +258,16 @@ def get_resnet_fpn_train(num_classes, alpha_bb8, num_layers, num_filters,
     mx.Symbol
 
     """
-    from symbol.resnet import get_resnet_conv, get_resnet_conv_down
+    from symbol.resnet import get_ssd_conv, get_ssd_conv_down
     data = mx.symbol.Variable('data')
     label = mx.sym.Variable('label')
 
     # shared convolutional layers, bottom up
-    conv_feat = get_resnet_conv(data, num_layers)
+    conv_feat = get_ssd_conv(data, num_layers)
 
     # shared convolutional layers, top down
-    _, conv_fpn_feat = get_resnet_conv_down(conv_feat)
-    conv_fpn_feat.reverse()     # [P2, P3, P4, P5, P6]
+    _, conv_fpn_feat = get_ssd_conv_down(conv_feat)
+    conv_fpn_feat.reverse()     # [P4, P5, P6, P7, P8]
 
     loc_preds, cls_preds, anchor_boxes, bb8_preds = multibox_layer(conv_fpn_feat, \
         num_classes, sizes=sizes, ratios=ratios, normalization=normalizations, \

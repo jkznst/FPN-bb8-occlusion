@@ -244,8 +244,10 @@ def get_ssd_conv_down(conv_feat):
     P4 = mx.sym.ElementWiseSum(*[P5_clip, P4_la], name="P4_sum")
     P4 = conv_act_layer(from_layer=P4, kernel=(3, 3), pad=(1, 1), num_filter=256, name="P4", use_act=False)
 
-    conv_fpn_feat = [conv_C8, conv_C7, P6, P5, P4]
-    return conv_fpn_feat
+    conv_fpn_feat = dict()
+    conv_fpn_feat.update({"stride256": conv_C8, "stride128": conv_C7, "stride64": P6, "stride32": P5, "stride16": P4})
+
+    return conv_fpn_feat, [conv_C8, conv_C7, P6, P5, P4]
 
 
 def get_detnet_conv(data, num_layers):

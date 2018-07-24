@@ -12,9 +12,9 @@ def parse_args():
                         default=os.path.join(os.getcwd(), 'data', 'OCCLUSION', 'val.rec'), type=str)
     parser.add_argument('--list-path', dest='list_path', help='which list file to use',
                         default="", type=str)
-    parser.add_argument('--network', dest='network', type=str, default='resnet50m',
+    parser.add_argument('--network', dest='network', type=str, default='resnet50',
                         help='which network to use')
-    parser.add_argument('--batch-size', dest='batch_size', type=int, default=2,
+    parser.add_argument('--batch-size', dest='batch_size', type=int, default=32,
                         help='evaluation batch size')
     parser.add_argument('--num-class', dest='num_class', type=int, default=8,
                         help='number of classes')
