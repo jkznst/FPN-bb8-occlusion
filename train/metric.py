@@ -75,10 +75,10 @@ class MultiBoxMetric(mx.metric.EvalMetric):
                         instanceDet = sampleDet[indices[0]] # only consider the most confident instance
                         loc_mae_pixel.append(np.abs((instanceDet[2:6] - instanceLabel[1:5]) * image_size))
                         bb8_mae_pixel.append(np.abs((instanceDet[6:22] - instanceLabel[8:24]) * image_size))
-                    else:
-                        # punish missed gt
-                        loc_mae_pixel.append(np.ones(shape=(4,), dtype=np.float32) * image_size)
-                        bb8_mae_pixel.append(np.ones(shape=(16,), dtype=np.float32) * image_size)
+                    # else:
+                    #     # punish missed gt
+                    #     loc_mae_pixel.append(np.ones(shape=(4,), dtype=np.float32) * image_size)
+                    #     bb8_mae_pixel.append(np.ones(shape=(16,), dtype=np.float32) * image_size)
         loc_mae_pixel = np.array(loc_mae_pixel)
         loc_mae_pixel_x = loc_mae_pixel[:, [0, 2]]
         loc_mae_pixel_y = loc_mae_pixel[:, [1, 3]]

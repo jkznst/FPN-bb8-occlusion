@@ -566,9 +566,9 @@ class PoseMetric(mx.metric.EvalMetric):
                             else:
                                 assert cid in self.counts
                                 self.IoU2D0_9[cid] += 1
-                    else:
-                        loc_mae_pixel.append(np.ones((4, )) * 300.)
-                        bb8_mae_pixel.append(np.ones((16, )) * 300.)
+                    # else:
+                    #     loc_mae_pixel.append(np.ones((4, )) * 300.)
+                    #     bb8_mae_pixel.append(np.ones((16, )) * 300.)
 
         loc_mae_pixel = np.array(loc_mae_pixel)
         loc_mae_pixel_x = loc_mae_pixel[:, [0, 2]]
