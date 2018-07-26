@@ -162,27 +162,27 @@ def get_ssd_conv(data, num_layers):
     conv_C5, conv_C4, _, _ = get_resnetm_conv(data, num_layers)
 
     # extra conv C6
-    conv_1x1 = conv_act_layer(conv_C5, 'stage6_conv_1x1',
+    conv_1x1 = conv_act_layer(conv_C5, 'multi_feat_2_conv_1x1',
                               256, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
-    conv_C6 = conv_act_layer(conv_1x1, 'stage6_conv_3x3',
+    conv_C6 = conv_act_layer(conv_1x1, 'multi_feat_2_conv_3x3',
                               512, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
 
     # extra conv C7
-    conv_1x1 = conv_act_layer(conv_C6, 'stage7_conv_1x1',
+    conv_1x1 = conv_act_layer(conv_C6, 'multi_feat_3_conv_1x1',
                               128, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
-    conv_C7 = conv_act_layer(conv_1x1, 'stage7_conv_3x3',
+    conv_C7 = conv_act_layer(conv_1x1, 'multi_feat_3_conv_3x3',
                              256, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
 
     # extra conv C8
-    conv_1x1 = conv_act_layer(conv_C7, 'stage8_conv_1x1',
+    conv_1x1 = conv_act_layer(conv_C7, 'multi_feat_4_conv_1x1',
                               128, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
-    conv_C8 = conv_act_layer(conv_1x1, 'stage8_conv_3x3',
+    conv_C8 = conv_act_layer(conv_1x1, 'multi_feat_4_conv_3x3',
                              256, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
 
     # extra conv C9
-    conv_1x1 = conv_act_layer(conv_C8, 'stage9_conv_1x1',
+    conv_1x1 = conv_act_layer(conv_C8, 'multi_feat_5_conv_1x1',
                               128, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
-    conv_C9 = conv_act_layer(conv_1x1, 'stage9_conv_3x3',
+    conv_C9 = conv_act_layer(conv_1x1, 'multi_feat_5_conv_3x3',
                              256, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
 
     conv_feat = [conv_C9, conv_C8, conv_C7, conv_C6, conv_C5, conv_C4]
