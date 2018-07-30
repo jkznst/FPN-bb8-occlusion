@@ -1,5 +1,5 @@
 import mxnet as mx
-from symbol.common import multi_layer_feature_SSD, multibox_layer
+from symbol.common import multi_layer_feature_SSD, multibox_layer_FPN, multibox_layer_SSD
 from operator_py.training_target import *
 
 def import_module(module_name):
@@ -145,7 +145,7 @@ def get_symbol_train(network, num_classes, alpha_bb8, from_layers, num_filters, 
     layers = multi_layer_feature_SSD(body, from_layers, num_filters, strides, pads,
         min_filter=min_filter)
 
-    loc_preds, cls_preds, anchor_boxes, bb8_preds = multibox_layer(layers, \
+    loc_preds, cls_preds, anchor_boxes, bb8_preds = multibox_layer_SSD(layers, \
         num_classes, sizes=sizes, ratios=ratios, normalization=normalizations, \
         num_channels=num_filters, clip=False, interm_layer=0, steps=steps)
     # now cls_preds are in shape of  batchsize x num_class x num_anchors
@@ -269,7 +269,7 @@ def get_resnet_fpn_train(num_classes, alpha_bb8, num_layers, num_filters,
     _, conv_fpn_feat = get_ssd_conv_down(conv_feat)
     conv_fpn_feat.reverse()     # [P4, P5, P6, P7, P8]
 
-    loc_preds, cls_preds, anchor_boxes, bb8_preds = multibox_layer(conv_fpn_feat, \
+    loc_preds, cls_preds, anchor_boxes, bb8_preds = multibox_layer_FPN(conv_fpn_feat, \
         num_classes, sizes=sizes, ratios=ratios, normalization=normalizations, \
         num_channels=num_filters, clip=False, interm_layer=0, steps=steps)
     # now cls_preds are in shape of  batchsize x num_class x num_anchors
@@ -393,7 +393,7 @@ def get_resnetm_fpn_train(num_classes, alpha_bb8, num_layers, num_filters,
     _, conv_fpn_feat = get_ssd_conv_down(conv_feat)
     conv_fpn_feat.reverse()     # [P4, P5, P6, P7, P8]
 
-    loc_preds, cls_preds, anchor_boxes, bb8_preds = multibox_layer(conv_fpn_feat, \
+    loc_preds, cls_preds, anchor_boxes, bb8_preds = multibox_layer_FPN(conv_fpn_feat, \
         num_classes, sizes=sizes, ratios=ratios, normalization=normalizations, \
         num_channels=num_filters, clip=False, interm_layer=0, steps=steps)
     # now cls_preds are in shape of  batchsize x num_class x num_anchors
