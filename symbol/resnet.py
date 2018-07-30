@@ -44,7 +44,7 @@ def residual_unit(data, num_filter, stride, dim_match, name, bottle_neck=True, d
                                    no_bias=True, workspace=workspace, name=name + '_conv1')
         bn2 = mx.sym.BatchNorm(data=conv1, fix_gamma=False, eps=2e-5, momentum=bn_mom, name=name + '_bn2')
         act2 = mx.sym.Activation(data=bn2, act_type='relu', name=name + '_relu2')
-        conv2 = mx.sym.Convolution(data=act2, num_filter=int(num_filter*0.25), kernel=(3,3), stride=stride, pad=(1,1),
+        conv2 = mx.sym.Convolution(data=act2, num_filter=int(num_filter*0.25), kernel=(3,3), stride=stride, pad=dilate,
                                    dilate=dilate,
                                    no_bias=True, workspace=workspace, name=name + '_conv2')
         bn3 = mx.sym.BatchNorm(data=conv2, fix_gamma=False, eps=2e-5, momentum=bn_mom, name=name + '_bn3')
@@ -62,12 +62,12 @@ def residual_unit(data, num_filter, stride, dim_match, name, bottle_neck=True, d
     else:
         bn1 = mx.sym.BatchNorm(data=data, fix_gamma=False, momentum=bn_mom, eps=2e-5, name=name + '_bn1')
         act1 = mx.sym.Activation(data=bn1, act_type='relu', name=name + '_relu1')
-        conv1 = mx.sym.Convolution(data=act1, num_filter=num_filter, kernel=(3,3), stride=stride, pad=(1,1),
+        conv1 = mx.sym.Convolution(data=act1, num_filter=num_filter, kernel=(3,3), stride=stride, pad=dilate,
                                    dilate=dilate,
                                       no_bias=True, workspace=workspace, name=name + '_conv1')
         bn2 = mx.sym.BatchNorm(data=conv1, fix_gamma=False, momentum=bn_mom, eps=2e-5, name=name + '_bn2')
         act2 = mx.sym.Activation(data=bn2, act_type='relu', name=name + '_relu2')
-        conv2 = mx.sym.Convolution(data=act2, num_filter=num_filter, kernel=(3,3), stride=(1,1), pad=(1,1),
+        conv2 = mx.sym.Convolution(data=act2, num_filter=num_filter, kernel=(3,3), stride=(1,1), pad=dilate,
                                    dilate=dilate,
                                       no_bias=True, workspace=workspace, name=name + '_conv2')
         if dim_match:
@@ -252,21 +252,32 @@ def get_ssd_conv_down(conv_feat):
 
 def get_detnet_conv(data, num_layers):
     _, conv_C4, conv_C3, conv_C2 = get_resnet_conv(data, num_layers)
-    #  detnet res5
+    #  detnet res5 stride 16
     unit = residual_unit(data=conv_C4, num_filter=1024, stride=(1, 1), dim_match=False, name='detnet_stage5_unit1', dilate=(2,2))
     for i in range(2, units[3] + 1):
         unit = residual_unit(data=unit, num_filter=1024, stride=(1, 1), dim_match=True,
                              name='detnet_stage5_unit%s' % i)
     conv_C5 = unit
-    # detnet res6
-    unit = residual_unit(data=unit, num_filter=1024, stride=(1, 1), dim_match=False, name='detnet_stage6_unit1',
-                         dilate=(2,2))
+    # detnet res6 stride 16
+    unit = residual_unit(data=unit, num_filter=1024, stride=(1, 1), dim_match=False, name='detnet_stage6_unit1', dilate=(2,2))
     for i in range(2, 4):
         unit = residual_unit(data=unit, num_filter=1024, stride=(1, 1), dim_match=True,
                              name='detnet_stage6_unit%s' % i)
     conv_C6 = unit
 
-    conv_feat = [conv_C6, conv_C5, conv_C4, conv_C3, conv_C2]
+    # extra conv C7 stride 32
+    conv_1x1 = conv_act_layer(unit, 'multi_feat_3_conv_1x1',
+                              256, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
+    conv_C7 = conv_act_layer(conv_1x1, 'multi_feat_3_conv_3x3',
+                             512, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
+
+    # extra conv C8 stride 64
+    conv_1x1 = conv_act_layer(conv_C7, 'multi_feat_4_conv_1x1',
+                              128, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
+    conv_C8 = conv_act_layer(conv_1x1, 'multi_feat_4_conv_3x3',
+                             256, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
+
+    conv_feat = [conv_C8, conv_C7, conv_C6, conv_C5, conv_C4]
     return conv_feat
 
 
