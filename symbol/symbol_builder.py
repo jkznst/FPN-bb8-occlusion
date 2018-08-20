@@ -329,6 +329,130 @@ def get_resnet_fpn_train(num_classes, alpha_bb8, num_layers, num_filters,
     return out
 
 
+def get_resnetd_fpn_train(num_classes, alpha_bb8, num_layers, num_filters,
+                     sizes, ratios, normalizations=-1, steps=[], **kwargs):
+    """Build network symbol for training FPN
+
+    Parameters
+    ----------
+    network : str
+        base network symbol name
+    num_classes : int
+        number of object classes not including background
+    from_layers : list of str
+        feature extraction layers, use '' for add extra layers
+        For example:
+        from_layers = ['relu4_3', 'fc7', '', '', '', '']
+        which means extract feature from relu4_3 and fc7, adding 4 extra layers
+        on top of fc7
+    num_filters : list of int
+        number of filters for extra layers, you can use -1 for extracted features,
+        however, if normalization and scale is applied, the number of filter for
+        that layer must be provided.
+        For example:
+        num_filters = [512, -1, 512, 256, 256, 256]
+    strides : list of int
+        strides for the 3x3 convolution appended, -1 can be used for extracted
+        feature layers
+    pads : list of int
+        paddings for the 3x3 convolution, -1 can be used for extracted layers
+    sizes : list or list of list
+        [min_size, max_size] for all layers or [[], [], []...] for specific layers
+    ratios : list or list of list
+        [ratio1, ratio2...] for all layers or [[], [], ...] for specific layers
+    normalizations : int or list of int
+        use normalizations value for all layers or [...] for specific layers,
+        -1 indicate no normalizations and scales
+    steps : list
+        specify steps for each MultiBoxPrior layer, leave empty, it will calculate
+        according to layer dimensions
+    min_filter : int
+        minimum number of filters used in 1x1 convolution
+    nms_thresh : float
+        non-maximum suppression threshold
+    force_suppress : boolean
+        whether suppress different class objects
+    nms_topk : int
+        apply NMS to top K detections
+    minimum_negative_samples : int
+        always have some negative examples, no matter how many positive there are.
+        this is useful when training on images with no ground-truth.
+    Returns
+    -------
+    mx.Symbol
+
+    """
+    from symbol.resnet import get_detnet_conv
+    data = mx.symbol.Variable('data')
+    label = mx.sym.Variable('label')
+
+    # shared convolutional layers, bottom up
+    conv_feat = get_detnet_conv(data, num_layers)
+
+    # shared convolutional layers, top down
+    # _, conv_fpn_feat = get_ssd_conv_down(conv_feat)
+    conv_feat.reverse()     # [P4, P5, P6, P7, P8]
+
+    loc_preds, cls_preds, anchor_boxes, bb8_preds = multibox_layer_SSD(conv_feat, \
+        num_classes, sizes=sizes, ratios=ratios, normalization=normalizations, \
+        num_channels=num_filters, clip=False, interm_layer=0, steps=steps)
+    # now cls_preds are in shape of  batchsize x num_class x num_anchors
+
+    # loc_target, loc_target_mask, cls_target, bb8_target, bb8_target_mask = training_targets(anchors=anchor_boxes,
+    #             class_preds=cls_preds, labels=label)
+    loc_target, loc_target_mask, cls_target, bb8_target, bb8_target_mask = mx.symbol.Custom(op_type="training_targets",
+                                                                                            name="training_targets",
+                                                                                            anchors=anchor_boxes,
+                                                                                            cls_preds=cls_preds,
+                                                                                            labels=label)
+
+    # tmp = mx.contrib.symbol.MultiBoxTarget(
+    #     *[anchor_boxes, label, cls_preds], overlap_threshold=.5, \
+    #     ignore_label=-1, negative_mining_ratio=3, minimum_negative_samples=minimum_negative_samples, \
+    #     negative_mining_thresh=.5, variances=(0.1, 0.1, 0.2, 0.2),
+    #     name="multibox_target")
+    # loc_target = tmp[0]
+    # loc_target_mask = tmp[1]
+    # cls_target = tmp[2]
+
+    cls_prob = mx.symbol.SoftmaxOutput(data=cls_preds, label=cls_target, \
+        ignore_label=-1, use_ignore=True, grad_scale=1., multi_output=True, \
+        normalization='valid', name="cls_prob")
+    loc_loss_ = mx.symbol.smooth_l1(name="loc_loss_", \
+        data=loc_target_mask * (loc_preds - loc_target), scalar=1.0)
+    loc_loss = mx.symbol.MakeLoss(loc_loss_, grad_scale=1., \
+        normalization='valid', name="loc_loss")
+    bb8_loss_ = mx.symbol.smooth_l1(name="bb8_loss_", \
+        data=bb8_target_mask * (bb8_preds - bb8_target), scalar=1.0)
+    bb8_loss = mx.symbol.MakeLoss(bb8_loss_, grad_scale=alpha_bb8, \
+        normalization='valid', name="bb8_loss")
+
+    # monitoring training status
+    cls_label = mx.symbol.MakeLoss(data=cls_target, grad_scale=0, name="cls_label")
+    # anchor = mx.symbol.MakeLoss(data=mx.symbol.broadcast_mul(loc_target_mask.reshape((0,-1,4)), anchor_boxes), grad_scale=0, name='anchors')
+    anchors = mx.symbol.MakeLoss(data=anchor_boxes, grad_scale=0, name='anchors')
+    loc_mae = mx.symbol.MakeLoss(data=mx.sym.abs(loc_target_mask * (loc_preds - loc_target)),
+                                 grad_scale=0, name='loc_mae')
+    loc_label = mx.symbol.MakeLoss(data=loc_target_mask * loc_target, grad_scale=0., name='loc_label')
+    loc_pred_masked = mx.symbol.MakeLoss(data=loc_target_mask * loc_preds, grad_scale=0, name='loc_pred_masked')
+    bb8_label = mx.symbol.MakeLoss(data=bb8_target_mask * bb8_target, grad_scale=0, name='bb8_label')
+    bb8_pred = mx.symbol.MakeLoss(data=bb8_preds, grad_scale=0, name='bb8_pred')
+    bb8_pred_masked = mx.symbol.MakeLoss(data=bb8_target_mask * bb8_preds, grad_scale=0, name='bb8_pred_masked')
+    bb8_mae = mx.symbol.MakeLoss(data=mx.sym.abs(bb8_target_mask * (bb8_preds - bb8_target)),
+                                 grad_scale=0, name='bb8_mae')
+
+    # det = mx.contrib.symbol.MultiBoxDetection(*[cls_prob, loc_preds, anchor_boxes], \
+    #     name="detection", nms_threshold=nms_thresh, force_suppress=force_suppress,
+    #     variances=(0.1, 0.1, 0.2, 0.2), nms_topk=nms_topk)
+    # det = mx.symbol.MakeLoss(data=det, grad_scale=0, name="det_out")
+    loc_pred = mx.symbol.MakeLoss(data=loc_preds, grad_scale=0, name='loc_pred')
+
+    # group output
+    out = mx.symbol.Group([cls_prob, loc_loss, cls_label, bb8_loss, loc_pred, bb8_pred,
+                           anchors, loc_label, loc_pred_masked, loc_mae, bb8_label, bb8_pred_masked, bb8_mae])
+    return out
+
+
 def get_resnetm_fpn_train(num_classes, alpha_bb8, num_layers, num_filters,
                      sizes, ratios, normalizations=-1, steps=[], **kwargs):
     """Build network symbol for training FPN

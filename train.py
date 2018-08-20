@@ -135,19 +135,25 @@ if __name__ == '__main__':
             args.pretrained = 'model/resnet-50-0000.params'
         if not args.prefix:
             args.prefix = 'out/resnet50'
-        args.freeze_pattern = ['conv0', 'stage1', 'gamma', 'beta']
+        args.freeze_pattern = []
+    elif args.network == 'resnet50d':
+        if not args.pretrained:
+            args.pretrained = 'model/resnet-50-0000.params'
+        if not args.prefix:
+            args.prefix = 'out/resnet50'
+        args.freeze_pattern = []
     elif args.network == 'resnet50m':
         if not args.pretrained:
             args.pretrained = 'model/resnet-50-0000.params'
         if not args.prefix:
             args.prefix = 'out/resnet50'
-        args.freeze_pattern = ['conv0', 'stage1', 'gamma', 'beta']
+        args.freeze_pattern = ['conv0', 'stage1', 'gamma', 'beta']  # used for fpn
     elif args.network == 'resnet101':
         if not args.pretrained:
             args.pretrained = 'model/resnet-101-0000.params'
         if not args.prefix:
             args.prefix = 'out/resnet101'
-        args.freeze_pattern = ['conv0', 'stage1', 'gamma', 'beta']
+        args.freeze_pattern = []
     # start training
     train_net(args.network, args.train_path,
               args.num_class, args.batch_size,
