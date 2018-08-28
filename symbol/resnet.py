@@ -333,6 +333,66 @@ def get_detnet_conv(data, num_layers):
     return conv_feat
 
 
+def get_deeplabv2_conv(data, num_layers):
+    _, _, conv_C3, conv_C2 = get_resnet_conv(data, num_layers)
+    #  deeplabv2 res4 stride 8
+    unit = residual_unit(data=conv_C3, num_filter=1024, stride=(1, 1), dim_match=False, name='stage3_unit1', dilate=(2,2))
+    for i in range(2, units[2] + 1):
+        unit = residual_unit(data=unit, num_filter=1024, stride=(1, 1), dim_match=True, dilate=(2, 2),
+                             name='stage3_unit%s' % i)
+    conv_C4 = unit
+    # deeplabv2 res5 stride 8
+    unit = residual_unit(data=unit, num_filter=2048, stride=(1, 1), dim_match=False, name='stage4_unit1', dilate=(4, 4))
+    for i in range(2, units[3] + 1):
+        unit = residual_unit(data=unit, num_filter=2048, stride=(1, 1), dim_match=True, dilate=(4, 4),
+                             name='stage4_unit%s' % i)
+    conv_C5 = unit
+
+    # extra conv C6 stride 16
+    conv_1x1 = conv_act_layer(unit, 'multi_feat_3_conv_1x1',
+                              128, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
+    conv_C6 = conv_act_layer(conv_1x1, 'multi_feat_3_conv_3x3',
+                             256, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
+
+    # extra conv C7 stride 32
+    conv_1x1 = conv_act_layer(conv_C6, 'multi_feat_4_conv_1x1',
+                              128, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
+    conv_C7 = conv_act_layer(conv_1x1, 'multi_feat_4_conv_3x3',
+                             256, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
+
+    conv_feat = [conv_C7, conv_C6, conv_C5, conv_C4, conv_C3]
+
+    # _, conv_C4, conv_C3, conv_C2 = get_resnet_conv(data, num_layers)
+    #
+    # # detnet res5 stride 16
+    # unit = residual_unit(data=conv_C4, num_filter=2048, stride=(1, 1), dim_match=False, name='stage4_unit1', dilate=(2, 2))
+    # for i in range(2, units[3] + 1):
+    #     unit = residual_unit(data=unit, num_filter=2048, stride=(1, 1), dim_match=True,
+    #                          name='stage4_unit%s' % i)
+    # conv_C5 = unit
+    #
+    # # extra conv C6 stride 16
+    # conv_1x1 = conv_act_layer(unit, 'multi_feat_2_conv_1x1',
+    #                           256, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
+    # conv_C6 = conv_act_layer(conv_1x1, 'multi_feat_2_conv_3x3',
+    #                          512, kernel=(3, 3), pad=(2, 2), stride=(1, 1), dilate=(2, 2), act_type='relu')
+    #
+    # # extra conv C7 stride 32
+    # conv_1x1 = conv_act_layer(conv_C6, 'multi_feat_3_conv_1x1',
+    #                           128, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
+    # conv_C7 = conv_act_layer(conv_1x1, 'multi_feat_3_conv_3x3',
+    #                          256, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
+    #
+    # # extra conv C8 stride 64
+    # conv_1x1 = conv_act_layer(conv_C7, 'multi_feat_4_conv_1x1',
+    #                           128, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
+    # conv_C8 = conv_act_layer(conv_1x1, 'multi_feat_4_conv_3x3',
+    #                          256, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
+    #
+    # conv_feat = [conv_C8, conv_C7, conv_C6, conv_C5, conv_C4]
+    return conv_feat
+
+
 def get_detnet_conv_down(conv_feat):
     # conv_C8, conv_C7, conv_C6, conv_C5, conv_C4 = conv_feat
     #
