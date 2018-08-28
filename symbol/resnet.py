@@ -193,13 +193,13 @@ def get_resnet_conv_down_mask_style(conv_feat):
 
 
 def get_ssd_conv(data, num_layers):
-    conv_C5, conv_C4, _, _ = get_resnet_conv(data, num_layers)
+    conv_C5, conv_C4, conv_C3, _ = get_resnet_conv(data, num_layers)
 
     # extra conv C6
     conv_1x1 = conv_act_layer(conv_C5, 'multi_feat_2_conv_1x1',
-                              256, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
+                              128, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
     conv_C6 = conv_act_layer(conv_1x1, 'multi_feat_2_conv_3x3',
-                              512, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
+                              256, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
 
     # extra conv C7
     conv_1x1 = conv_act_layer(conv_C6, 'multi_feat_3_conv_1x1',
@@ -219,22 +219,38 @@ def get_ssd_conv(data, num_layers):
     conv_C9 = conv_act_layer(conv_1x1, 'multi_feat_5_conv_3x3',
                              256, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
 
-    conv_feat = [conv_C9, conv_C8, conv_C7, conv_C6, conv_C5, conv_C4]
+    conv_feat = [conv_C7, conv_C6, conv_C5, conv_C4, conv_C3]
     return conv_feat
 
 
 def get_ssd_conv_down(conv_feat):
-    conv_C9, conv_C8, conv_C7, conv_C6, conv_C5, conv_C4 = conv_feat
+    conv_C7, conv_C6, conv_C5, conv_C4, conv_C3 = conv_feat
 
-    # C6 to P6, 1x1 dimension reduction to 256
-    P6 = conv_act_layer(from_layer=conv_C6, kernel=(1, 1), num_filter=256, name="P6_lateral", use_act=False)
-    P6_up = mx.symbol.UpSampling(P6, scale=2, sample_type='nearest', workspace=512, name='P6_upsampling', num_args=1)
-    P6 = conv_act_layer(from_layer=P6, kernel=(3, 3), pad=(1, 1), num_filter=256, name="P6", use_act=False)
+    # # C6 to P6, 1x1 dimension reduction to 256
+    # P6 = conv_act_layer(from_layer=conv_C6, kernel=(1, 1), num_filter=256, name="P6_lateral", use_act=False)
+    # P6_up = mx.symbol.UpSampling(P6, scale=2, sample_type='nearest', workspace=512, name='P6_upsampling', num_args=1)
+    # P6 = conv_act_layer(from_layer=P6, kernel=(3, 3), pad=(1, 1), num_filter=256, name="P6", use_act=False)
+    #
+    # # P6 2x upsampling + C5 = P5
+    # P5_la = conv_act_layer(from_layer=conv_C5, kernel=(1, 1), num_filter=256, name="P5_lateral", use_act=False)
+    # P6_clip = mx.symbol.Crop(*[P6_up, P5_la], name="P5_clip")
+    # P5 = mx.sym.ElementWiseSum(*[P6_clip, P5_la], name="P5_sum")
+    # P5_up = mx.symbol.UpSampling(P5, scale=2, sample_type='nearest', workspace=512, name='P5_upsampling', num_args=1)
+    # P5 = conv_act_layer(from_layer=P5, kernel=(3, 3), pad=(1, 1), num_filter=256, name="P5", use_act=False)
+    #
+    # # P5 2x upsampling + C4 = P4
+    # P4_la = conv_act_layer(from_layer=conv_C4, kernel=(1, 1), num_filter=256, name="P4_lateral", use_act=False)
+    # P5_clip = mx.symbol.Crop(*[P5_up, P4_la], name="P4_clip")
+    # P4 = mx.sym.ElementWiseSum(*[P5_clip, P4_la], name="P4_sum")
+    # P4 = conv_act_layer(from_layer=P4, kernel=(3, 3), pad=(1, 1), num_filter=256, name="P4", use_act=False)
+    #
+    # conv_fpn_feat = dict()
+    # conv_fpn_feat.update({"stride256": conv_C8, "stride128": conv_C7, "stride64": P6, "stride32": P5, "stride16": P4})
+    #
+    # return conv_fpn_feat, [conv_C8, conv_C7, P6, P5, P4]
 
-    # P6 2x upsampling + C5 = P5
-    P5_la = conv_act_layer(from_layer=conv_C5, kernel=(1, 1), num_filter=256, name="P5_lateral", use_act=False)
-    P6_clip = mx.symbol.Crop(*[P6_up, P5_la], name="P5_clip")
-    P5 = mx.sym.ElementWiseSum(*[P6_clip, P5_la], name="P5_sum")
+    # C5 to P5, 1x1 dimension reduction to 256
+    P5 = conv_act_layer(from_layer=conv_C5, kernel=(1, 1), num_filter=256, name="P5_lateral", use_act=False)
     P5_up = mx.symbol.UpSampling(P5, scale=2, sample_type='nearest', workspace=512, name='P5_upsampling', num_args=1)
     P5 = conv_act_layer(from_layer=P5, kernel=(3, 3), pad=(1, 1), num_filter=256, name="P5", use_act=False)
 
@@ -242,109 +258,134 @@ def get_ssd_conv_down(conv_feat):
     P4_la = conv_act_layer(from_layer=conv_C4, kernel=(1, 1), num_filter=256, name="P4_lateral", use_act=False)
     P5_clip = mx.symbol.Crop(*[P5_up, P4_la], name="P4_clip")
     P4 = mx.sym.ElementWiseSum(*[P5_clip, P4_la], name="P4_sum")
+    P4_up = mx.symbol.UpSampling(P4, scale=2, sample_type='nearest', workspace=512, name='P4_upsampling', num_args=1)
     P4 = conv_act_layer(from_layer=P4, kernel=(3, 3), pad=(1, 1), num_filter=256, name="P4", use_act=False)
 
-    conv_fpn_feat = dict()
-    conv_fpn_feat.update({"stride256": conv_C8, "stride128": conv_C7, "stride64": P6, "stride32": P5, "stride16": P4})
+    # P4 2x upsampling + C3 = P3
+    P3_la = conv_act_layer(from_layer=conv_C3, kernel=(1, 1), num_filter=256, name="P3_lateral", use_act=False)
+    P4_clip = mx.symbol.Crop(*[P4_up, P3_la], name="P3_clip")
+    P3 = mx.sym.ElementWiseSum(*[P4_clip, P3_la], name="P3_sum")
+    P3 = conv_act_layer(from_layer=P3, kernel=(3, 3), pad=(1, 1), num_filter=256, name="P3", use_act=False)
 
-    return conv_fpn_feat, [conv_C8, conv_C7, P6, P5, P4]
+    conv_fpn_feat = dict()
+    conv_fpn_feat.update({"stride128": conv_C7, "stride64": conv_C6, "stride32": P5, "stride16": P4, "stride8": P3})
+
+    return conv_fpn_feat, [conv_C7, conv_C6, P5, P4, P3]
 
 
 def get_detnet_conv(data, num_layers):
-    # _, _, conv_C3, conv_C2 = get_resnet_conv(data, num_layers)
-    # #  detnet res4 stride 8
-    # unit = residual_unit(data=conv_C3, num_filter=1024, stride=(1, 1), dim_match=False, name='stage3_unit1', dilate=(2,2))
-    # for i in range(2, units[2] + 1):
-    #     unit = residual_unit(data=unit, num_filter=1024, stride=(1, 1), dim_match=True,
-    #                          name='stage3_unit%s' % i)
-    # conv_C4 = unit
-    # # detnet res5 stride 8
-    # unit = residual_unit(data=unit, num_filter=2048, stride=(1, 1), dim_match=False, name='stage4_unit1', dilate=(2,2))
-    # for i in range(2, units[3] + 1):
-    #     unit = residual_unit(data=unit, num_filter=2048, stride=(1, 1), dim_match=True,
-    #                          name='stage4_unit%s' % i)
-    # conv_C5 = unit
-    #
-    # # extra conv C6 stride 16
-    # conv_1x1 = conv_act_layer(unit, 'multi_feat_3_conv_1x1',
-    #                           256, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
-    # conv_C6 = conv_act_layer(conv_1x1, 'multi_feat_3_conv_3x3',
-    #                          512, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
-    #
-    # # extra conv C7 stride 32
-    # conv_1x1 = conv_act_layer(conv_C6, 'multi_feat_4_conv_1x1',
-    #                           128, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
-    # conv_C7 = conv_act_layer(conv_1x1, 'multi_feat_4_conv_3x3',
-    #                          256, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
-    #
-    # conv_feat = [conv_C7, conv_C6, conv_C5, conv_C4, conv_C3]
-
-    _, conv_C4, conv_C3, conv_C2 = get_resnet_conv(data, num_layers)
-
-    # detnet res5 stride 16
-    unit = residual_unit(data=conv_C4, num_filter=2048, stride=(1, 1), dim_match=False, name='stage4_unit1', dilate=(2, 2))
+    _, _, conv_C3, conv_C2 = get_resnet_conv(data, num_layers)
+    #  detnet res4 stride 8
+    unit = residual_unit(data=conv_C3, num_filter=1024, stride=(1, 1), dim_match=False, name='stage3_unit1', dilate=(2,2))
+    for i in range(2, units[2] + 1):
+        unit = residual_unit(data=unit, num_filter=1024, stride=(1, 1), dim_match=True,
+                             name='stage3_unit%s' % i)
+    conv_C4 = unit
+    # detnet res5 stride 8
+    unit = residual_unit(data=unit, num_filter=2048, stride=(1, 1), dim_match=False, name='stage4_unit1', dilate=(2,2))
     for i in range(2, units[3] + 1):
         unit = residual_unit(data=unit, num_filter=2048, stride=(1, 1), dim_match=True,
                              name='stage4_unit%s' % i)
     conv_C5 = unit
 
     # extra conv C6 stride 16
-    conv_1x1 = conv_act_layer(unit, 'multi_feat_2_conv_1x1',
-                              256, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
-    conv_C6 = conv_act_layer(conv_1x1, 'multi_feat_2_conv_3x3',
-                             512, kernel=(3, 3), pad=(2, 2), stride=(1, 1), dilate=(2, 2), act_type='relu')
+    conv_1x1 = conv_act_layer(unit, 'multi_feat_3_conv_1x1',
+                              128, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
+    conv_C6 = conv_act_layer(conv_1x1, 'multi_feat_3_conv_3x3',
+                             256, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
 
     # extra conv C7 stride 32
-    conv_1x1 = conv_act_layer(conv_C6, 'multi_feat_3_conv_1x1',
+    conv_1x1 = conv_act_layer(conv_C6, 'multi_feat_4_conv_1x1',
                               128, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
-    conv_C7 = conv_act_layer(conv_1x1, 'multi_feat_3_conv_3x3',
+    conv_C7 = conv_act_layer(conv_1x1, 'multi_feat_4_conv_3x3',
                              256, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
 
-    # extra conv C8 stride 64
-    conv_1x1 = conv_act_layer(conv_C7, 'multi_feat_4_conv_1x1',
-                              128, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
-    conv_C8 = conv_act_layer(conv_1x1, 'multi_feat_4_conv_3x3',
-                             256, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
+    conv_feat = [conv_C7, conv_C6, conv_C5, conv_C4, conv_C3]
 
-    conv_feat = [conv_C8, conv_C7, conv_C6, conv_C5, conv_C4]
+    # _, conv_C4, conv_C3, conv_C2 = get_resnet_conv(data, num_layers)
+    #
+    # # detnet res5 stride 16
+    # unit = residual_unit(data=conv_C4, num_filter=2048, stride=(1, 1), dim_match=False, name='stage4_unit1', dilate=(2, 2))
+    # for i in range(2, units[3] + 1):
+    #     unit = residual_unit(data=unit, num_filter=2048, stride=(1, 1), dim_match=True,
+    #                          name='stage4_unit%s' % i)
+    # conv_C5 = unit
+    #
+    # # extra conv C6 stride 16
+    # conv_1x1 = conv_act_layer(unit, 'multi_feat_2_conv_1x1',
+    #                           256, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
+    # conv_C6 = conv_act_layer(conv_1x1, 'multi_feat_2_conv_3x3',
+    #                          512, kernel=(3, 3), pad=(2, 2), stride=(1, 1), dilate=(2, 2), act_type='relu')
+    #
+    # # extra conv C7 stride 32
+    # conv_1x1 = conv_act_layer(conv_C6, 'multi_feat_3_conv_1x1',
+    #                           128, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
+    # conv_C7 = conv_act_layer(conv_1x1, 'multi_feat_3_conv_3x3',
+    #                          256, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
+    #
+    # # extra conv C8 stride 64
+    # conv_1x1 = conv_act_layer(conv_C7, 'multi_feat_4_conv_1x1',
+    #                           128, kernel=(1, 1), pad=(0, 0), stride=(1, 1), act_type='relu')
+    # conv_C8 = conv_act_layer(conv_1x1, 'multi_feat_4_conv_3x3',
+    #                          256, kernel=(3, 3), pad=(1, 1), stride=(2, 2), act_type='relu')
+    #
+    # conv_feat = [conv_C8, conv_C7, conv_C6, conv_C5, conv_C4]
     return conv_feat
 
 
 def get_detnet_conv_down(conv_feat):
-    conv_C6, conv_C5, conv_C4, conv_C3, conv_C2 = conv_feat
-    # C6 to P6, 1x1 dimension reduction to 256
-    P6 = conv_act_layer(from_layer=conv_C6, kernel=(1, 1), num_filter=256, name="P6_lateral", use_act=False)
+    # conv_C8, conv_C7, conv_C6, conv_C5, conv_C4 = conv_feat
+    #
+    # # C6 to P6, 1x1 dimension reduction to 256
+    # P6 = conv_act_layer(from_layer=conv_C6, kernel=(1, 1), num_filter=256, name="P6_lateral", use_act=False)
+    # P6_up = mx.symbol.UpSampling(P6, scale=2, sample_type='nearest', workspace=512, name='P6_upsampling', num_args=1)
+    # P6 = conv_act_layer(from_layer=P6, kernel=(3, 3), pad=(1, 1), num_filter=256, name="P6", use_act=False)
+    #
+    # # P6 2x upsampling + C5 = P5
+    # P5_la = conv_act_layer(from_layer=conv_C5, kernel=(1, 1), num_filter=256, name="P5_lateral", use_act=False)
+    # P6_clip = mx.symbol.Crop(*[P6_up, P5_la], name="P5_clip")
+    # P5 = mx.sym.ElementWiseSum(*[P6_clip, P5_la], name="P5_sum")
+    # P5_up = mx.symbol.UpSampling(P5, scale=2, sample_type='nearest', workspace=512, name='P5_upsampling', num_args=1)
+    # P5 = conv_act_layer(from_layer=P5, kernel=(3, 3), pad=(1, 1), num_filter=256, name="P5", use_act=False)
+    #
+    # # P5 2x upsampling + C4 = P4
+    # P4_la = conv_act_layer(from_layer=conv_C4, kernel=(1, 1), num_filter=256, name="P4_lateral", use_act=False)
+    # P5_clip = mx.symbol.Crop(*[P5_up, P4_la], name="P4_clip")
+    # P4 = mx.sym.ElementWiseSum(*[P5_clip, P4_la], name="P4_sum")
+    # P4 = conv_act_layer(from_layer=P4, kernel=(3, 3), pad=(1, 1), num_filter=256, name="P4", use_act=False)
+    #
+    # conv_fpn_feat = dict()
+    # conv_fpn_feat.update({"stride256": conv_C8, "stride128": conv_C7, "stride64": P6, "stride32": P5, "stride16": P4})
+    #
+    # return conv_fpn_feat, [conv_C8, conv_C7, P6, P5, P4]
+    conv_C7, conv_C6, conv_C5, conv_C4, conv_C3 = conv_feat
 
-    # P6 + C5 = P5
+    # C5 to P5, 1x1 dimension reduction to 256
     P5 = conv_act_layer(from_layer=conv_C5, kernel=(1, 1), num_filter=256, name="P5_lateral", use_act=False)
-    P5 = mx.symbol.ElementWiseSum(*[P6, P5], name="P5_sum")
+    # P5_up = mx.symbol.UpSampling(P5, scale=2, sample_type='nearest', workspace=512, name='P5_upsampling', num_args=1)
 
-    # P5 + C4 = P4
-    P4_la   = conv_act_layer(from_layer=conv_C4, kernel=(1, 1), num_filter=256, name="P4_lateral", use_act=False)
-    P4      = mx.sym.ElementWiseSum(*[P5, P4_la], name="P4_sum")
-    P4_up = mx.symbol.UpSampling(P4, scale=2, sample_type='nearest', workspace=512, name='P4_upsampling', num_args=1)
+
+    # P5 2x upsampling + C4 = P4
+    P4_la = conv_act_layer(from_layer=conv_C4, kernel=(1, 1), num_filter=256, name="P4_lateral", use_act=False)
+    # P5_clip = mx.symbol.Crop(*[P5_up, P4_la], name="P4_clip")
+    P4 = mx.sym.ElementWiseSum(*[P5, P4_la], name="P4_sum")
+    # P4_up = mx.symbol.UpSampling(P4, scale=2, sample_type='nearest', workspace=512, name='P4_upsampling', num_args=1)
+
 
     # P4 2x upsampling + C3 = P3
-    P3_la   = conv_act_layer(from_layer=conv_feat[2], kernel=(1, 1), num_filter=256, name="P3_lateral", use_act=False)
-    P4_clip = mx.symbol.Crop(*[P4_up, P3_la], name="P3_clip")
-    P3      = mx.sym.ElementWiseSum(*[P4_clip, P3_la], name="P3_sum")
-    P3_up = mx.symbol.UpSampling(P3, scale=2, sample_type='nearest', workspace=512, name='P3_upsampling', num_args=1)
+    P3_la = conv_act_layer(from_layer=conv_C3, kernel=(1, 1), num_filter=256, name="P3_lateral", use_act=False)
+    # P4_clip = mx.symbol.Crop(*[P4_up, P3_la], name="P3_clip")
+    P3 = mx.sym.ElementWiseSum(*[P4, P3_la], name="P3_sum")
 
-    # P3 2x upsampling + C2 = P2
-    P2_la   = conv_act_layer(from_layer=conv_feat[3], kernel=(1, 1), num_filter=256, name="P2_lateral", use_act=False)
-    P3_clip = mx.symbol.Crop(*[P3_up, P2_la], name="P2_clip")
-    P2      = mx.sym.ElementWiseSum(*[P3_clip, P2_la], name="P2_sum")
 
-    P6 = conv_act_layer(from_layer=P6, kernel=(3, 3), pad=(1, 1), num_filter=256, name="P6", use_act=False)
     P5 = conv_act_layer(from_layer=P5, kernel=(3, 3), pad=(1, 1), num_filter=256, name="P5", use_act=False)
     P4 = conv_act_layer(from_layer=P4, kernel=(3, 3), pad=(1, 1), num_filter=256, name="P4", use_act=False)
     P3 = conv_act_layer(from_layer=P3, kernel=(3, 3), pad=(1, 1), num_filter=256, name="P3", use_act=False)
-    P2 = conv_act_layer(from_layer=P2, kernel=(3, 3), pad=(1, 1), num_filter=256, name="P2", use_act=False)
 
     conv_fpn_feat = dict()
-    conv_fpn_feat.update({"stride64": P6, "stride32": P5, "stride16": P4, "stride8": P3, "stride4": P2})
+    conv_fpn_feat.update({"stride64": conv_C7, "stride32": conv_C6, "stride16": P5, "stride8": P4, "stride4": P3})
 
-    return conv_fpn_feat, [P6, P5, P4, P3, P2]
+    return conv_fpn_feat, [conv_C7, conv_C6, P5, P4, P3]
 
 
 def resnet(units, num_stages, filter_list, num_classes, image_shape, bottle_neck=True, bn_mom=0.9, workspace=256, memonger=False):
