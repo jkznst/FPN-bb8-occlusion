@@ -83,11 +83,11 @@ def get_config(network, data_shape, **kwargs):
         num_layers = 50
         image_shape = '3,224,224'  # resnet require it as shape check
         network = 'resnet'
-        from_layers = ['P4', 'P5', 'P6', 'P7', 'P8']
+        from_layers = ['P3', 'P4', 'P5', 'P6', 'P7']
         num_filters = [-1, -1, -1, -1, -1]
         strides = [-1, -1, -1, -1, -1]
         pads = [-1, -1, -1, -1, -1]
-        sizes = get_scales(min_scale=0.2, max_scale=0.72, num_layers=len(from_layers))
+        sizes = get_scales(min_scale=0.1, max_scale=0.5, num_layers=len(from_layers))
         ratios = [[1, 2, .5], [1, 2, .5], [1, 2, .5], [1, 2, .5], \
                   [1, 2, .5]]
         normalizations = -1
@@ -97,11 +97,11 @@ def get_config(network, data_shape, **kwargs):
         num_layers = 50
         image_shape = '3,224,224'  # resnet require it as shape check
         network = 'resnet'
-        from_layers = ['P4', 'P5', 'P6', 'P7', 'P8']
+        from_layers = ['P3', 'P4', 'P5', 'P6', 'P7']
         num_filters = [-1, -1, -1, -1, -1]
         strides = [-1, -1, -1, -1, -1]
         pads = [-1, -1, -1, -1, -1]
-        sizes = get_scales(min_scale=0.2, max_scale=0.72, num_layers=len(from_layers))
+        sizes = get_scales(min_scale=0.1, max_scale=0.5, num_layers=len(from_layers))
         ratios = [[1, 2, .5], [1, 2, .5], [1, 2, .5], [1, 2, .5], \
                   [1, 2, .5]]
         normalizations = -1
