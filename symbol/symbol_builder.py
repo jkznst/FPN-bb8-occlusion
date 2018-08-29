@@ -514,10 +514,10 @@ def get_resnetdeeplabv2_fpn_train(num_classes, alpha_bb8, num_layers, num_filter
     conv_feat = get_deeplabv2_conv(data, num_layers)
 
     # shared convolutional layers, top down
-    # _, conv_fpn_feat = get_detnet_conv_down(conv_feat)
-    conv_feat.reverse()     # [P3, P4, P5, P6, P7]
+    _, conv_fpn_feat = get_detnet_conv_down(conv_feat)
+    conv_fpn_feat.reverse()     # [P3, P4, P5, P6, P7]
 
-    loc_preds, cls_preds, anchor_boxes, bb8_preds = multibox_layer_SSD(conv_feat, \
+    loc_preds, cls_preds, anchor_boxes, bb8_preds = multibox_layer_FPN(conv_fpn_feat, \
         num_classes, sizes=sizes, ratios=ratios, normalization=normalizations, \
         num_channels=num_filters, clip=False, interm_layer=0, steps=steps)
     # now cls_preds are in shape of  batchsize x num_class x num_anchors
