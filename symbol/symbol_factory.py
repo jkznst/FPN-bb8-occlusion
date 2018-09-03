@@ -135,6 +135,20 @@ def get_config(network, data_shape, **kwargs):
         normalizations = -1
         steps = []
         return locals()
+    elif network == 'resnet50md':
+        num_layers = 50
+        image_shape = '3,224,224'  # resnet require it as shape check
+        network = 'resnetm'
+        from_layers = ['P3', 'P4', 'P5', 'P6', 'P7']
+        num_filters = [-1, -1, -1, -1, -1]
+        strides = [-1, -1, -1, -1, -1]
+        pads = [-1, -1, -1, -1, -1]
+        sizes = get_scales(min_scale=0.1, max_scale=0.5, num_layers=len(from_layers))
+        ratios = [[1, 2, .5], [1, 2, .5], [1, 2, .5], [1, 2, .5], \
+                  [1, 2, .5]]
+        normalizations = -1
+        steps = []
+        return locals()
     elif network == 'resnet101':
         num_layers = 101
         image_shape = '3,224,224'
@@ -277,6 +291,7 @@ def get_symbol_train(network, data_shape, alpha_bb8,  **kwargs):
         'resnet50d': symbol_builder.get_resnetd_fpn_train,
         'resnet50deeplabv2': symbol_builder.get_resnetdeeplabv2_fpn_train,
         'resnet50m':symbol_builder.get_resnetm_fpn_train,
+        'resnet50md': symbol_builder.get_resnetmd_fpn_train,
         'resnet101': symbol_builder.get_resnet_fpn_train
     }
     if network not in networks:
