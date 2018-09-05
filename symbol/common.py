@@ -699,6 +699,7 @@ def multibox_layer_FPN(from_layers, num_classes, sizes=[.2, .95],
     loc_pred_layers = []
     cls_pred_layers = []
     bb8_pred_layers = []
+    bb8_anchor_cls_pred_layers = []
     anchor_layers = []
     num_classes += 1 # always use background as label 0
 
@@ -754,7 +755,7 @@ def multibox_layer_FPN(from_layers, num_classes, sizes=[.2, .95],
         loc_pred_layers.append(loc_pred)
 
         # create bb8 prediction layer
-        num_bb8_pred = num_anchors * 16
+        num_bb8_pred = num_anchors * 16 * 9
         # bias = mx.symbol.Variable(name="{}_bb8_pred_conv_bias".format(from_name),
         #                           init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
         bb8_pred = mx.symbol.Convolution(data=from_layer, weight=bb8_pred_weight, bias=bb8_pred_bias, kernel=(3, 3), \
@@ -763,6 +764,17 @@ def multibox_layer_FPN(from_layers, num_classes, sizes=[.2, .95],
         bb8_pred = mx.symbol.transpose(bb8_pred, axes=(0, 2, 3, 1))
         bb8_pred = mx.symbol.Flatten(data=bb8_pred)
         bb8_pred_layers.append(bb8_pred)
+
+        # create bb8 anchor class prediction layer
+        num_bb8_anchor_cls_pred = num_anchors * 8 * 9
+        bias = mx.symbol.Variable(name="{}_bb8_anchor_cls_pred_conv_bias".format(from_name),
+                                  init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
+        bb8_anchor_cls_pred = mx.symbol.Convolution(data=from_layer, bias=bias, kernel=(3, 3), \
+                                                    stride=(1, 1), pad=(1, 1), num_filter=num_bb8_anchor_cls_pred, \
+                                                    name="{}_bb8_anchor_cls_pred_conv".format(from_name))
+        bb8_anchor_cls_pred = mx.symbol.transpose(bb8_anchor_cls_pred, axes=(0, 2, 3, 1))
+        bb8_anchor_cls_pred = mx.symbol.Flatten(data=bb8_anchor_cls_pred)
+        bb8_anchor_cls_pred_layers.append(bb8_anchor_cls_pred)
 
         # create class prediction layer
         num_cls_pred = num_anchors * num_classes
@@ -793,11 +805,17 @@ def multibox_layer_FPN(from_layers, num_classes, sizes=[.2, .95],
         dim=1)
     cls_preds = mx.symbol.Reshape(data=cls_preds, shape=(0, -1, num_classes))
     cls_preds = mx.symbol.transpose(cls_preds, axes=(0, 2, 1), name="multibox_cls_pred")
+
+    bb8_anchor_cls_preds = mx.symbol.Concat(*bb8_anchor_cls_pred_layers, num_args=len(bb8_anchor_cls_pred_layers), \
+                                            dim=1)
+    bb8_anchor_cls_preds = mx.symbol.Reshape(data=bb8_anchor_cls_preds, shape=(0, -1, 9))
+    bb8_anchor_cls_preds = mx.symbol.transpose(bb8_anchor_cls_preds, axes=(0, 2, 1),
+                                               name="multibox_bb8_anchor_cls_pred")
+
     anchor_boxes = mx.symbol.Concat(*anchor_layers, \
         num_args=len(anchor_layers), dim=1)
     anchor_boxes = mx.symbol.Reshape(data=anchor_boxes, shape=(0, -1, 4), name="multibox_anchors")
-    return [loc_preds, cls_preds, anchor_boxes, bb8_preds]
-
+    return [loc_preds, cls_preds, anchor_boxes, bb8_preds, bb8_anchor_cls_preds]
 
 def multibox_layer_SSD(from_layers, num_classes, sizes=[.2, .95],
                     ratios=[1], normalization=-1, num_channels=[],

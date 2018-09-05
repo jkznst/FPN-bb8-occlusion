@@ -641,18 +641,17 @@ def get_resnetm_fpn_train(num_classes, alpha_bb8, num_layers, num_filters,
     _, conv_fpn_feat = get_ssd_conv_down(conv_feat)
     conv_fpn_feat.reverse()     # [P3, P4, P5, P6, P7]
 
-    loc_preds, cls_preds, anchor_boxes, bb8_preds = multibox_layer_FPN(conv_fpn_feat, \
+    loc_preds, cls_preds, anchor_boxes, bb8_preds, bb8_anchor_cls_preds = multibox_layer_FPN(conv_fpn_feat, \
         num_classes, sizes=sizes, ratios=ratios, normalization=normalizations, \
         num_channels=num_filters, clip=False, interm_layer=0, steps=steps)
     # now cls_preds are in shape of  batchsize x num_class x num_anchors
 
-    # loc_target, loc_target_mask, cls_target, bb8_target, bb8_target_mask = training_targets(anchors=anchor_boxes,
-    #             class_preds=cls_preds, labels=label)
-    loc_target, loc_target_mask, cls_target, bb8_target, bb8_target_mask = mx.symbol.Custom(op_type="training_targets",
-                                                                                            name="training_targets",
-                                                                                            anchors=anchor_boxes,
-                                                                                            cls_preds=cls_preds,
-                                                                                            labels=label)
+    loc_target, loc_target_mask, cls_target, bb8_target, bb8_target_mask, anchor_cls_target = mx.symbol.Custom(
+        op_type="training_targets",
+        name="training_targets",
+        anchors=anchor_boxes,
+        cls_preds=cls_preds,
+        labels=label)
 
     # tmp = mx.contrib.symbol.MultiBoxTarget(
     #     *[anchor_boxes, label, cls_preds], overlap_threshold=.5, \
@@ -666,6 +665,9 @@ def get_resnetm_fpn_train(num_classes, alpha_bb8, num_layers, num_filters,
     cls_prob = mx.symbol.SoftmaxOutput(data=cls_preds, label=cls_target, \
         ignore_label=-1, use_ignore=True, grad_scale=1., multi_output=True, \
         normalization='valid', name="cls_prob")
+    bb8_anchor_cls_prob = mx.symbol.SoftmaxOutput(data=bb8_anchor_cls_preds, label=anchor_cls_target, \
+                                                  ignore_label=-1, use_ignore=True, grad_scale=1., multi_output=True, \
+                                                  normalization='valid', name="bb8_anchor_cls_prob")
     loc_loss_ = mx.symbol.smooth_l1(name="loc_loss_", \
         data=loc_target_mask * (loc_preds - loc_target), scalar=1.0)
     loc_loss = mx.symbol.MakeLoss(loc_loss_, grad_scale=1., \
@@ -677,6 +679,7 @@ def get_resnetm_fpn_train(num_classes, alpha_bb8, num_layers, num_filters,
 
     # monitoring training status
     cls_label = mx.symbol.MakeLoss(data=cls_target, grad_scale=0, name="cls_label")
+    bb8_anchor_cls_label = mx.symbol.MakeLoss(data=anchor_cls_target, grad_scale=0., name="bb8_anchor_cls_label")
     # anchor = mx.symbol.MakeLoss(data=mx.symbol.broadcast_mul(loc_target_mask.reshape((0,-1,4)), anchor_boxes), grad_scale=0, name='anchors')
     anchors = mx.symbol.MakeLoss(data=anchor_boxes, grad_scale=0, name='anchors')
     loc_mae = mx.symbol.MakeLoss(data=mx.sym.abs(loc_target_mask * (loc_preds - loc_target)),
@@ -697,7 +700,8 @@ def get_resnetm_fpn_train(num_classes, alpha_bb8, num_layers, num_filters,
 
     # group output
     out = mx.symbol.Group([cls_prob, loc_loss, cls_label, bb8_loss, loc_pred, bb8_pred,
-                           anchors, loc_label, loc_pred_masked, loc_mae, bb8_label, bb8_pred_masked, bb8_mae])
+                           anchors, loc_label, loc_pred_masked, loc_mae, bb8_label, bb8_pred_masked, bb8_mae,
+                           bb8_anchor_cls_prob, bb8_anchor_cls_label])
     return out
 
 
@@ -765,18 +769,19 @@ def get_resnetmd_fpn_train(num_classes, alpha_bb8, num_layers, num_filters,
     _, conv_fpn_feat = get_ssd_md_conv_down(conv_feat)
     conv_fpn_feat.reverse()     # [P3, P4, P5, P6, P7]
 
-    loc_preds, cls_preds, anchor_boxes, bb8_preds = multibox_layer_FPN(conv_fpn_feat, \
+    loc_preds, cls_preds, anchor_boxes, bb8_preds, bb8_anchor_cls_preds = multibox_layer_FPN(conv_fpn_feat, \
         num_classes, sizes=sizes, ratios=ratios, normalization=normalizations, \
         num_channels=num_filters, clip=False, interm_layer=0, steps=steps)
     # now cls_preds are in shape of  batchsize x num_class x num_anchors
 
     # loc_target, loc_target_mask, cls_target, bb8_target, bb8_target_mask = training_targets(anchors=anchor_boxes,
     #             class_preds=cls_preds, labels=label)
-    loc_target, loc_target_mask, cls_target, bb8_target, bb8_target_mask = mx.symbol.Custom(op_type="training_targets",
-                                                                                            name="training_targets",
-                                                                                            anchors=anchor_boxes,
-                                                                                            cls_preds=cls_preds,
-                                                                                            labels=label)
+    loc_target, loc_target_mask, cls_target, bb8_target, bb8_target_mask, anchor_cls_target = mx.symbol.Custom(
+        op_type="training_targets",
+        name="training_targets",
+        anchors=anchor_boxes,
+        cls_preds=cls_preds,
+        labels=label)
 
     # tmp = mx.contrib.symbol.MultiBoxTarget(
     #     *[anchor_boxes, label, cls_preds], overlap_threshold=.5, \
@@ -790,6 +795,9 @@ def get_resnetmd_fpn_train(num_classes, alpha_bb8, num_layers, num_filters,
     cls_prob = mx.symbol.SoftmaxOutput(data=cls_preds, label=cls_target, \
         ignore_label=-1, use_ignore=True, grad_scale=1., multi_output=True, \
         normalization='valid', name="cls_prob")
+    bb8_anchor_cls_prob = mx.symbol.SoftmaxOutput(data=bb8_anchor_cls_preds, label=anchor_cls_target, \
+                                                  ignore_label=-1, use_ignore=True, grad_scale=1., multi_output=True, \
+                                                  normalization='valid', name="bb8_anchor_cls_prob")
     loc_loss_ = mx.symbol.smooth_l1(name="loc_loss_", \
         data=loc_target_mask * (loc_preds - loc_target), scalar=1.0)
     loc_loss = mx.symbol.MakeLoss(loc_loss_, grad_scale=1., \
@@ -801,6 +809,7 @@ def get_resnetmd_fpn_train(num_classes, alpha_bb8, num_layers, num_filters,
 
     # monitoring training status
     cls_label = mx.symbol.MakeLoss(data=cls_target, grad_scale=0, name="cls_label")
+    bb8_anchor_cls_label = mx.symbol.MakeLoss(data=anchor_cls_target, grad_scale=0., name="bb8_anchor_cls_label")
     # anchor = mx.symbol.MakeLoss(data=mx.symbol.broadcast_mul(loc_target_mask.reshape((0,-1,4)), anchor_boxes), grad_scale=0, name='anchors')
     anchors = mx.symbol.MakeLoss(data=anchor_boxes, grad_scale=0, name='anchors')
     loc_mae = mx.symbol.MakeLoss(data=mx.sym.abs(loc_target_mask * (loc_preds - loc_target)),
@@ -821,7 +830,8 @@ def get_resnetmd_fpn_train(num_classes, alpha_bb8, num_layers, num_filters,
 
     # group output
     out = mx.symbol.Group([cls_prob, loc_loss, cls_label, bb8_loss, loc_pred, bb8_pred,
-                           anchors, loc_label, loc_pred_masked, loc_mae, bb8_label, bb8_pred_masked, bb8_mae])
+                           anchors, loc_label, loc_pred_masked, loc_mae, bb8_label, bb8_pred_masked, bb8_mae,
+                           bb8_anchor_cls_prob, bb8_anchor_cls_label])
     return out
 
 

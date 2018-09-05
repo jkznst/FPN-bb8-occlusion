@@ -95,6 +95,59 @@ def TransformBB8(anchors=None, bb8_pred=None, clip=True, variances=(0.1, 0.1, 0.
     return out
 
 
+def FineGrainedTransformBB8(anchors=None, bb8_anchor_cls_prob=None, bb8_pred=None, clip=True, variances=(0.1, 0.1, 0.2, 0.2)):
+    """
+    :param anchors: NDArray, 1 x num_anchors x 4
+    :param bb8_anchor_cls_prob: NDArray, batchsize x 9 x (num_anchors x 8)
+    :param bb8_pred: NDArray, batchsize x (num_anchors x 16 x 9)
+    :param clip: (boolean, optional, default=True) clip out-of-boundary boxes
+    :param variances: (tuple of, optional, default=(0.1,0.1,0.2,0.2)) variances to be decoded from box regression output
+    :return: output: NDArray, batchsize x num_anchors x 16, locations in [x, y, x, y, ...]
+    """
+    bb8_pred = mx.nd.reshape(bb8_pred, shape=(0, -1, 72, 2))
+    bb8_pred_x = bb8_pred[:, :, :, 0]         # [batchsize, num_anchors, 72]
+    bb8_pred_y = bb8_pred[:, :, :, 1]
+
+    al = anchors[:, :, 0:1]
+    at = anchors[:, :, 1:2]
+    ar = anchors[:, :, 2:3]
+    ab = anchors[:, :, 3:4]
+    aw = ar - al                # [1, num_anchors, 1]
+    ah = ab - at
+    acx = (al + ar) / 2.0
+    acy = (at + ab) / 2.0
+
+    a_left_ctr_x = acx - aw / 3.0
+    a_right_ctr_x = acx + aw / 3.0
+    a_top_ctr_y = acy - ah / 3.0
+    a_bottom_ctr_y = acy + ah / 3.0
+
+    a_centers_x = mx.nd.concat(a_left_ctr_x, acx, a_right_ctr_x,
+                               a_left_ctr_x, acx, a_right_ctr_x,
+                               a_left_ctr_x, acx, a_right_ctr_x, dim=-1)    # [1, num_anchors, 9]
+    a_centers_y = mx.nd.concat(a_top_ctr_y, a_top_ctr_y, a_top_ctr_y,
+                               acy, acy, acy,
+                               a_bottom_ctr_y, a_bottom_ctr_y, a_bottom_ctr_y, dim=-1)
+
+    out_x = bb8_pred_x * aw * variances[0] + mx.nd.tile(a_centers_x, reps=(1,1,8))      # [batchsize, num_anchors, 72]
+    out_y = bb8_pred_y * ah * variances[1] + mx.nd.tile(a_centers_y, reps=(1,1,8))
+
+    out_x = mx.nd.reshape(out_x, shape=(0, 0, 8, 9))        # [batchsize, num_anchors, 8, 9]
+    out_y = mx.nd.reshape(out_y, shape=(0, 0, 8, 9))
+    # out = mx.nd.stack(out_x, out_y, axis=-1)        # [batchsize, num_anchors, 72, 2]
+
+    anchor_cls_inds = mx.nd.reshape(mx.nd.argmax(bb8_anchor_cls_prob, axis=1), shape=(0, -1, 8))         # [batchsize, num_anchors, 8]
+    out_x = mx.nd.pick(out_x, anchor_cls_inds, axis=-1)                                                 # [batchsize, num_anchors, 8]
+    out_y = mx.nd.pick(out_y, anchor_cls_inds, axis=-1)
+    out = mx.nd.stack(out_x, out_y, axis=-1)        # [batchsize, num_anchors, 8, 2]
+    out = mx.nd.reshape(out, shape=(0, 0, -1))      # [batchsize, num_anchors, 16]
+
+    if clip:
+        out = mx.nd.maximum(0, mx.nd.minimum(1, out))
+
+    return out
+
+
 def nms(dets, thresh, force_suppress=True, num_classes=1):
     """
     greedily select boxes with high confidence and overlap with current maximum <= thresh
@@ -299,6 +352,79 @@ def BB8MultiBoxDetection(cls_prob, loc_pred, bb8_pred, anchors, \
     return out
 
 
+def BB8FineGrainedAnchorMultiBoxDetection(cls_prob, loc_pred, bb8_anchor_cls_pred, bb8_pred, anchors, \
+                    threshold=0.01, clip=True, background_id=0, nms_threshold=0.45, force_suppress=False,
+                    variances=(0.1, 0.1, 0.2, 0.2), nms_topk=400, name=None):
+    """
+    Parameters:
+    :param cls_prob: class probabilities, batchsize x (num_classes + 1) x num_anchors
+    :param loc_pred: location regression predictions, batchsize x (num_anchors x 4)
+    :param bb8_anchor_cls_pred: fine grained anchor classifications, batchsize x 9 x (num_anchors x 8)
+    :param bb8_pred: fine grained bb8 regression predictions, batchsize x (num_anchors x 16 x 9)
+    :param anchors: multibox prior anchor boxes, 1 x num_anchors x 4
+    :param threshold: (float, optional, default=0.01) threshold to be a positive prediction
+    :param clip: (boolean, optional, default=True) clip out-of-boundary boxes
+    :param background_id: (int optional, default='0') background id
+    :param nms_threshold: (float, optional, default=0.5) non-maximum suppression threshold
+    :param force_suppress: (boolean, optional, default=False) suppress all detections regardless of class_id
+    :param variances: (tuple of, optional, default=(0.1,0.1,0.2,0.2)) variances to be decoded from box regression output
+    :param nms_topk: (int, optional, default=-1) keep maximum top k detections before nms, -1 for no limit.
+    :param out: (NDArray, optional) the output NDArray to hold the result.
+    :param name:
+
+    :return: out: (NDArray or list of NDArray) the output of this function.
+    """
+    assert background_id == 0, "No implementation for background_id is not 0!!"
+    assert len(variances) == 4, "Variance size must be 4"
+    assert nms_threshold > 0, "NMS_threshold should be greater than 0!!!"
+    assert nms_threshold <=1, "NMS_threshold should be less than 1!!!"
+
+    # ctx = cls_prob.context
+    num_classes = cls_prob.shape[1] # including background
+    num_anchors = cls_prob.shape[2]
+    num_batches = cls_prob.shape[0]
+
+    out = mx.nd.ones(shape=(num_batches, num_anchors, 22)) * -1
+    # remove background, restore original id
+    out[:, :, 0] = mx.nd.argmax(cls_prob[:, 1:, :], axis=1, keepdims=False)                 # cid
+    out[:, :, 1] = mx.nd.max(cls_prob[:, 1:, :], axis=1, keepdims=False, exclude=False)     # score
+    out[:, :, 2:6] = TransformLocations(anchors, loc_pred, clip, variances)                 # 2D bbox
+    out[:, :, 6:22] = FineGrainedTransformBB8(anchors, bb8_anchor_cls_pred,
+                                              bb8_pred, clip, variances)                    # bb8 coordinate
+
+    # if the score < positive threshold, reset the id and score to -1
+    out[:, :, 0] = mx.nd.where(condition=out[:, :, 1]<threshold,
+                x=mx.nd.ones_like(out[:, :, 1]) * -1,
+                y=out[:, :, 0])
+    out[:, :, 1] = mx.nd.where(condition=out[:, :, 1] < threshold,
+                               x=mx.nd.ones_like(out[:, :, 1]) * -1,
+                               y=out[:, :, 1])
+
+    valid_count = mx.nd.sum(out[:, :, 0] >= 0, axis=0, keepdims=False, exclude=True)
+    valid_count = valid_count.asnumpy()
+
+    #*******************************************************************************************
+
+    for nbatch in range(num_batches):
+        p_out = out[nbatch, :, :]
+
+        if (valid_count[nbatch] < 1) or (nms_threshold <= 0) or (nms_threshold > 1):
+            continue
+
+        # sort and apply NMS
+        nkeep = nms_topk if nms_topk<valid_count[nbatch] else int(valid_count[nbatch])
+        # sort confidence in descend order and re-order output
+        p_out[0:nkeep] = p_out[p_out[:, 1].topk(k=nkeep)]
+        p_out[nkeep:, 0] = -1    # not performed in original mxnet MultiBoxDetection, add by zhangxin
+
+        # apply nms
+        keep_indices = nms(p_out[0:nkeep], nms_threshold, force_suppress, num_classes-1)
+        keep_indices = np.array(keep_indices)
+        p_out[0:len(keep_indices)] = p_out[keep_indices]
+        p_out[len(keep_indices):, 0] = -1
+        out[nbatch, :, :] = p_out
+
+    return out
 
 
 
