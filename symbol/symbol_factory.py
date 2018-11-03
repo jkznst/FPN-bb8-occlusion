@@ -290,7 +290,7 @@ def get_symbol_train(network, data_shape, alpha_bb8,  **kwargs):
         'resnet50': symbol_builder.get_resnet_fpn_train,
         'resnet50d': symbol_builder.get_resnetd_fpn_train,
         'resnet50deeplabv2': symbol_builder.get_resnetdeeplabv2_fpn_train,
-        'resnet50m':symbol_builder.get_resnetm_fpn_train,
+        'resnet50m':symbol_builder.get_resnetm_ssd_train,
         'resnet50md': symbol_builder.get_resnetmd_fpn_train,
         'resnet101': symbol_builder.get_resnet_fpn_train
     }

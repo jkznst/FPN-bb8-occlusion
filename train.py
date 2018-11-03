@@ -90,7 +90,7 @@ def parse_args():
                         help='use difficult ground-truths in evaluation')
     parser.add_argument('--voc07', dest='use_voc07_metric', type=bool, default=True,
                         help='use PASCAL VOC 07 11-point metric')
-    parser.add_argument('--tensorboard', dest='tensorboard', type=bool, default=True,
+    parser.add_argument('--tensorboard', dest='tensorboard', type=bool, default=False,
                         help='save metrics into tensorboard readable files')
     parser.add_argument('--min_neg_samples', dest='min_neg_samples', type=int, default=0,
                         help='min number of negative samples taken in hard mining.')
