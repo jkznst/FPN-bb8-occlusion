@@ -51,8 +51,8 @@ class TrainingTargets(mx.operator.CustomOp):
         loc_preds = loc_preds.reshape(shape=(0, -1, 4)) # [batchsize, num_all_anchors, 4]
         det_center_x = mx.nd.slice_axis(data=loc_preds, axis=2, begin=0, end=1) * self.variances[0] * width + centerx
         det_center_y = mx.nd.slice_axis(data=loc_preds, axis=2, begin=1, end=2) * self.variances[1] * height + centery
-        det_width = mx.nd.exp(data=mx.nd.slice_axis(data=loc_preds, axis=2, begin=2, end=3) * self.variances[2]) * width
-        det_height = mx.nd.exp(data=mx.nd.slice_axis(data=loc_preds, axis=2, begin=3, end=4) * self.variances[3]) * height
+        det_width = mx.nd.exp(data=(mx.nd.slice_axis(data=loc_preds, axis=2, begin=2, end=3) * self.variances[2])) * width
+        det_height = mx.nd.exp(data=(mx.nd.slice_axis(data=loc_preds, axis=2, begin=3, end=4) * self.variances[3])) * height
         det_results_transformed = mx.nd.concat(det_center_x, det_center_y, det_width, det_height, dim=2)    # [batchsize, num_all_anchors, 4]
 
         bb8_target = mx.nd.zeros_like(data=bb8_mask)    # batchsize x num_anchors x 16

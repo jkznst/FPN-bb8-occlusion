@@ -1,6 +1,6 @@
 import mxnet as mx
 import numpy as np
-from MultiBoxDetection import myMultiBoxDetection, BB8MultiBoxDetection
+from MultiBoxDetection import BB8MultiBoxDetection, IndirectBB8MultiBoxDetection
 
 
 class MultiBoxMetric(mx.metric.EvalMetric):
@@ -42,7 +42,7 @@ class MultiBoxMetric(mx.metric.EvalMetric):
         bb8_pred = preds[5]
         anchors = preds[6]
         # anchor_in_use = anchors[anchors.nonzero()]
-        bb8dets = BB8MultiBoxDetection(cls_prob, loc_pred, bb8_pred, anchors, nms_threshold=0.5, force_suppress=False,
+        bb8dets = IndirectBB8MultiBoxDetection(cls_prob, loc_pred, bb8_pred, anchors, nms_threshold=0.5, force_suppress=False,
                                       variances=(0.1, 0.1, 0.2, 0.2), nms_topk=400)
         bb8dets = bb8dets.asnumpy()
 
