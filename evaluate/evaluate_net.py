@@ -11,7 +11,7 @@ import cv2
 from tqdm import tqdm
 from dataset.iterator import DetRecordIter
 from config.config import cfg
-from evaluate.eval_metric import MApMetric, VOC07MApMetric, PoseMetric
+from evaluate.eval_metric import MApMetric, VOC07MApMetric, PoseMetric_inference, PoseMetric_deploy
 import logging
 from symbol.symbol_factory import get_symbol
 from MultiBoxDetection import BB8MultiBoxDetection
@@ -90,7 +90,7 @@ def evaluate_net(net, path_imgrec, num_classes, mean_pixels, data_shape,
                  model_prefix, epoch, ctx=mx.cpu(), batch_size=1,
                  path_imglist="", nms_thresh=0.45, force_nms=False,
                  ovp_thresh=0.5, use_difficult=False, class_names=None,
-                 voc07_metric=False, frequent=20):
+                 voc07_metric=False, frequent=20, deploy=False):
     """
     evalute network given validation record file
 
@@ -150,6 +150,7 @@ def evaluate_net(net, path_imgrec, num_classes, mean_pixels, data_shape,
     # network
     if net is None:
         net = load_net
+        print("deploy mode.")
     else:
         net = get_symbol(net, data_shape[1], num_classes=num_classes,
             nms_thresh=nms_thresh, force_suppress=force_nms)
@@ -171,7 +172,10 @@ def evaluate_net(net, path_imgrec, num_classes, mean_pixels, data_shape,
         metric = MApMetric(ovp_thresh, use_difficult, class_names,
                             roc_output_path=os.path.join(os.path.dirname(model_prefix), 'roc'))
 
-    posemetric = PoseMetric(LINEMOD_path='/data/ZHANGXIN/DATASETS/SIXD_CHALLENGE/LINEMOD/', classes=class_names)
+    if deploy:
+        posemetric = PoseMetric_deploy(LINEMOD_path='/media/DataDisk2_4T/zhangxin/DATASETS/SIXD_CHALLENGE/LINEMOD/', classes=class_names)
+    else:
+        posemetric = PoseMetric_inference(LINEMOD_path='/media/DataDisk2_4T/zhangxin/DATASETS/SIXD_CHALLENGE/LINEMOD/', classes=class_names)
 
     # visualize bb8 results
     # for nbatch, eval_batch in tqdm(enumerate(eval_iter)):
@@ -217,10 +221,16 @@ def evaluate_net(net, path_imgrec, num_classes, mean_pixels, data_shape,
     #         #          plot_path='./output/bb8results/{:04d}'.format(nbatch * batch_size + nsample))
 
     # quantitive results
-    results = mod.score(eval_iter, [metric, posemetric], num_batch=None,
+    if deploy:
+        results = mod.score(eval_iter, [metric, posemetric], num_batch=None,
                         batch_end_callback=mx.callback.Speedometer(batch_size,
                                                                    frequent=frequent,
                                                                    auto_reset=False))
+    else:
+        results = mod.score(eval_iter, [posemetric], num_batch=None,
+                            batch_end_callback=mx.callback.Speedometer(batch_size,
+                                                                       frequent=frequent,
+                                                                       auto_reset=False))
 
     results_save_path = os.path.join(os.path.dirname(model_prefix), 'evaluate_results')
     with open(results_save_path, 'w') as f:

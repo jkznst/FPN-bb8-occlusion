@@ -153,7 +153,8 @@ if __name__ == '__main__':
             args.pretrained = 'model/resnet-50-0000.params'
         if not args.prefix:
             args.prefix = 'out/resnet50'
-        args.freeze_pattern = []
+        args.freeze_pattern = ['conv0', 'stage1']    # finetune bb8
+        # args.freeze_pattern = []
     elif args.network == 'resnet50md':
         if not args.pretrained:
             args.pretrained = 'model/resnet-50-0000.params'

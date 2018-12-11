@@ -12,14 +12,14 @@ def parse_args():
                         default=os.path.join(os.getcwd(), 'data', 'OCCLUSION', 'val.rec'), type=str)
     parser.add_argument('--list-path', dest='list_path', help='which list file to use',
                         default="", type=str)
-    parser.add_argument('--network', dest='network', type=str, default='resnet50',
+    parser.add_argument('--network', dest='network', type=str, default='resnet50m',
                         help='which network to use')
-    parser.add_argument('--batch-size', dest='batch_size', type=int, default=32,
+    parser.add_argument('--batch-size', dest='batch_size', type=int, default=16,
                         help='evaluation batch size')
     parser.add_argument('--num-class', dest='num_class', type=int, default=8,
                         help='number of classes')
     parser.add_argument('--class-names', dest='class_names', type=str,
-                        default='obj_01, obj_02, obj_05, obj_06, obj_08, obj_09, obj_11, obj_12',
+                        default='obj_01, obj_05, obj_06, obj_08, obj_09, obj_10, obj_11, obj_12',
                         # 'aeroplane, bicycle, bird, boat, bottle, bus, \
                         # car, cat, chair, cow, diningtable, dog, horse, motorbike, \
                         # person, pottedplant, sheep, sofa, train, tvmonitor',
@@ -27,9 +27,9 @@ def parse_args():
     parser.add_argument('--epoch', dest='epoch', help='epoch of pretrained model',
                         default=45, type=int)
     parser.add_argument('--prefix', dest='prefix', help='load model prefix',
-                        default=os.path.join(os.getcwd(), 'output/OCCLUSION/resnet50m-300-lr0.001-alpha10-wd0.0005', 'ssd'), type=str)
+                        default=os.path.join(os.getcwd(), 'output/OCCLUSION/ssd-resnet50m-512', 'ssd'), type=str)
     parser.add_argument('--gpus', dest='gpu_id', help='GPU devices to evaluate with',
-                        default='1', type=str)
+                        default='2', type=str)
     parser.add_argument('--cpu', dest='cpu', help='use cpu to evaluate, this can be slow',
                         action='store_true', default=False)
     parser.add_argument('--data-shape', dest='data_shape', type=int, default=300,
@@ -51,7 +51,7 @@ def parse_args():
     parser.add_argument('--voc07', dest='use_voc07_metric', type=bool, default=False,
                         help='use PASCAL VOC 07 metric')
     parser.add_argument('--deploy', dest='deploy_net', help='Load network from model',
-                        action='store_true', default=True)
+                        action='store_true', default=False)
     parser.add_argument('--frequent', dest='frequent', help='frequency of logging',
                         default=10, type=int)
     args = parser.parse_args()
@@ -90,4 +90,5 @@ if __name__ == '__main__':
                  path_imglist=args.list_path, nms_thresh=args.nms_thresh,
                  force_nms=args.force_nms, ovp_thresh=args.overlap_thresh,
                  use_difficult=args.use_difficult, class_names=class_names,
-                 voc07_metric=args.use_voc07_metric, frequent=args.frequent)
+                 voc07_metric=args.use_voc07_metric, frequent=args.frequent,
+                 deploy=args.deploy_net)
