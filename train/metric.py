@@ -47,12 +47,16 @@ class MultiBoxMetric(mx.metric.EvalMetric):
         bb8dets = bb8dets.asnumpy()
 
         # monitor results
-        # loc_target = preds[7].asnumpy()
-        # loc_label_in_use = loc_target[loc_target.nonzero()]
+        loc_target = preds[7].asnumpy()
+        loc_label_in_use = loc_target[loc_target.nonzero()]
+        loc_target_length = np.mean(np.abs(loc_label_in_use))
+        loc_target_variance = np.var(np.abs(loc_label_in_use))
         # loc_pred_masked = preds[8].asnumpy()
         # loc_pred_in_use = loc_pred_masked[loc_pred_masked.nonzero()]
-        # bb8_target = preds[10].asnumpy()
-        # bb8_label_in_use = bb8_target[bb8_target.nonzero()]
+        bb8_target = preds[10].asnumpy()
+        bb8_label_in_use = bb8_target[bb8_target.nonzero()]
+        bb8_target_length = np.mean(np.abs(bb8_label_in_use))
+        bb8_target_variance = np.var(np.abs(bb8_label_in_use))
         # bb8_pred_masked = preds[11].asnumpy()
         # bb8_pred_in_use = bb8_pred_masked[bb8_pred_masked.nonzero()]
         loc_mae = preds[9].asnumpy()
