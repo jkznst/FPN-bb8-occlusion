@@ -16,7 +16,7 @@ def parse_args():
                         default=os.path.join(os.getcwd(), 'data', 'OCCLUSION', 'val.rec'), type=str)
     parser.add_argument('--val-list', dest='val_list', help='validation list to use',
                         default="", type=str)
-    parser.add_argument('--network', dest='network', type=str, default='resnet50',
+    parser.add_argument('--network', dest='network', type=str, default='resnet50m',
                         help='which network to use')
     parser.add_argument('--batch-size', dest='batch_size', type=int, default=8,
                         help='training batch size')
@@ -25,20 +25,20 @@ def parse_args():
     parser.add_argument('--finetune', dest='finetune', type=int, default=-1,
                         help='finetune from epoch n, rename the model before doing this')
     parser.add_argument('--pretrained', dest='pretrained', help='pretrained model prefix',
-                        default=os.path.join(os.getcwd(), 'model', 'resnet-50'), type=str)
+                        default=os.path.join(os.getcwd(), 'output/OCCLUSION/fpn-ssd-resnet50m-448-stage3-7-size0.1-0.5-nobb8/fpn'), type=str)
     parser.add_argument('--epoch', dest='epoch', help='epoch of pretrained model',
-                        default=0, type=int)
+                        default=45, type=int)
     parser.add_argument('--prefix', dest='prefix', help='new model prefix',
                         default=os.path.join(os.getcwd(), 'output', 'exp1', 'fpn'), type=str)
     parser.add_argument('--gpus', dest='gpus', help='GPU devices to train with',
-                        default='0', type=str)
+                        default='2,3', type=str)
     parser.add_argument('--begin-epoch', dest='begin_epoch', help='begin epoch of training',
                         default=0, type=int)
     parser.add_argument('--end-epoch', dest='end_epoch', help='end epoch of training',
                         default= 45, type=int)
     parser.add_argument('--frequent', dest='frequent', help='frequency of logging',
                         default=10, type=int)
-    parser.add_argument('--data-shape', dest='data_shape', type=int, default=512,
+    parser.add_argument('--data-shape', dest='data_shape', type=int, default=448,
                         help='set image shape')
     parser.add_argument('--label-width', dest='label_width', type=int, default=350,
                         help='force padding label width to sync across train and validation')
@@ -73,7 +73,7 @@ def parse_args():
     parser.add_argument('--num-example', dest='num_example', type=int, default=5717,
                         help='number of image examples')
     parser.add_argument('--class-names', dest='class_names', type=str,
-                        default='obj_01, obj_02, obj_05, obj_06, obj_08, obj_09, obj_11, obj_12',
+                        default='obj_01, obj_05, obj_06, obj_08, obj_09, obj_10, obj_11, obj_12',
                         # 'aeroplane, bicycle, bird, boat, bottle, bus, \
                         # car, cat, chair, cow, diningtable, dog, horse, motorbike, \
                         # person, pottedplant, sheep, sofa, train, tvmonitor',
@@ -153,8 +153,8 @@ if __name__ == '__main__':
             args.pretrained = 'model/resnet-50-0000.params'
         if not args.prefix:
             args.prefix = 'out/resnet50'
-        args.freeze_pattern = ['conv0', 'stage1']    # finetune bb8
-        # args.freeze_pattern = []
+        # args.freeze_pattern = ['conv0', 'stage1']    # finetune bb8
+        args.freeze_pattern = []
     elif args.network == 'resnet50md':
         if not args.pretrained:
             args.pretrained = 'model/resnet-50-0000.params'
